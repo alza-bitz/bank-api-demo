@@ -55,7 +55,7 @@
           repository (repo/->JdbcAccountRepository datasource)]
 
       ;; Create account
-      (let [created-account (repo/create-account repository {:name "Mr. Black"})]
+      (let [created-account (repo/create-account repository "Mr. Black")]
         (is (= "Mr. Black" (:name created-account)))
         (is (= 0 (:balance created-account)))
         (is (pos? (:account-number created-account)))

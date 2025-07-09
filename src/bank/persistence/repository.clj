@@ -8,14 +8,14 @@
 
 (defprotocol AccountRepository
   "Repository interface for account operations."
-  (create-account [this account-data])
+  (create-account [this account-name])
   (find-account [this account-number])
   (save-account-event [this account event]))
 
 (defrecord JdbcAccountRepository [datasource]
   AccountRepository
 
-  (create-account [_ {:keys [name]}]
+  (create-account [_ name]
     (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
       (jdbc/with-transaction [tx logged-ds]
         (let [result (sql/insert! tx :account {:name name}

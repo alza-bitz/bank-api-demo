@@ -7,13 +7,13 @@
 (deftest jdbc-repository-test
   (testing "create-account calls repository protocol correctly"
     (let [mock-repo (reify repo/AccountRepository
-                      (create-account [_ account-data]
+                      (create-account [_ name]
                         {:account-number 1
-                         :name (:name account-data)
+                         :name name
                          :balance 0})
                       (find-account [_ _] nil)
                       (save-account-event [_ _ _] nil))]
-      (let [result (repo/create-account mock-repo {:name "Mr. Black"})]
+      (let [result (repo/create-account mock-repo "Mr. Black")]
         (is (= 1 (:account-number result)))
         (is (= "Mr. Black" (:name result)))
         (is (= 0 (:balance result))))))
