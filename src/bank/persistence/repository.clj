@@ -43,34 +43,34 @@
 (defn create-tables!
   "Creates the account and account_event tables."
   [datasource]
-  (println "Creating tables...")
-  (jdbc/execute! datasource
-                 ["CREATE TABLE IF NOT EXISTS account (
+  (let [logging-datasource (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))] 
+    (jdbc/execute! logging-datasource
+                   ["CREATE TABLE IF NOT EXISTS account (
         id UUID PRIMARY KEY,
         account_number SERIAL NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
         balance INTEGER NOT NULL
       )"])
-  (jdbc/execute! datasource
-                 ["CREATE TABLE IF NOT EXISTS account_event (
+    (jdbc/execute! logging-datasource
+                   ["CREATE TABLE IF NOT EXISTS account_event (
         event_id SERIAL PRIMARY KEY,
         account_number INTEGER NOT NULL REFERENCES account(account_number),
         description VARCHAR(255) NOT NULL,
         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )"])
-  (println "Tables created."))
+      )"])))
 
 (defn drop-tables!
   "Drops the account and account_event tables."
   [datasource]
-  (jdbc/execute! datasource ["DROP TABLE IF EXISTS account_event"])
-  (jdbc/execute! datasource ["DROP TABLE IF EXISTS account"]))
+  (let [logging-datasource (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))] 
+    (jdbc/execute! logging-datasource ["DROP TABLE IF EXISTS account_event"])
+    (jdbc/execute! logging-datasource ["DROP TABLE IF EXISTS account"])))
 
 (defn logging-jdbc-account-repository
   "Creates a JdbcAccountRepository with logging wrapped datasource."
   [datasource]
   (->JdbcAccountRepository
-   (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))))
+   (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))))
 
 ;; Integrant methods
 (defmethod ig/init-key ::repository [_ {:keys [datasource]}]
