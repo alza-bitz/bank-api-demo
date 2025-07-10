@@ -43,20 +43,20 @@
 
 (deftest jdbc-repository-test
   (testing "save and find account"
-    (let [repository (repo/logging-jdbc-account-repository *datasource*)]
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
+          account (account/create-account "Mr. Black")
+          saved-account (repo/save-account repository account)]
 
-      ;; Save account
-      (let [account (account/create-account "Mr. Black")
-            saved-account (repo/save-account repository account)]
-        (is (account/valid-account? saved-account))
-        (is (= "Mr. Black" (:name saved-account)))
-        (is (= 0 (:balance saved-account)))
-        (is (pos? (:account-number saved-account)))
+      ;; Assert the saved account 
+      (is (account/valid-account? saved-account))
+      (is (= "Mr. Black" (:name saved-account)))
+      (is (= 0 (:balance saved-account)))
+      (is (pos? (:account-number saved-account)))
 
-        ;; Find the saved account
-        (let [found-account (repo/find-account repository (:account-number saved-account))]
-          (is (account/valid-saved-account? found-account))
-          (is (= saved-account found-account))))))
+      ;; Find the saved account
+      (let [found-account (repo/find-account repository (:account-number saved-account))]
+        (is (account/valid-saved-account? found-account))
+        (is (= saved-account found-account)))))
 
   (testing "find non-existent account returns nil"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)

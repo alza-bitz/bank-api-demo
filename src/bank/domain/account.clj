@@ -26,7 +26,7 @@
     [:map [:account-number account-number-spec]]))
 
 ;; Account event entity specs
-(def event-id-spec
+(def event-sequence-spec
   [:int {:min 1}])
 
 (def event-description-spec
@@ -34,10 +34,16 @@
 
 (def account-event-spec
   [:map
-   [:event-id {:optional true} event-id-spec]
+   [:id [:uuid]]
+   [:sequence {:optional true} event-sequence-spec]
    [:account-number account-number-spec]
    [:description event-description-spec]
    [:timestamp inst?]])
+
+(def saved-account-event-spec
+  (mu/merge
+   account-event-spec
+   [:map [:sequence event-sequence-spec]]))
 
 ;; Domain functions
 (defn create-account
@@ -53,7 +59,8 @@
   [account-number description]
   {:pre [(m/validate account-number-spec account-number)
          (m/validate event-description-spec description)]}
-  {:account-number account-number
+  {:id (random-uuid)
+   :account-number account-number
    :description description
    :timestamp (java.time.Instant/now)})
 
@@ -66,6 +73,9 @@
 
 (defn valid-account-event? [event]
   (m/validate account-event-spec event))
+
+(defn valid-saved-account-event? [event]
+  (m/validate saved-account-event-spec event))
 
 ;; Generator functions for testing
 (defn gen-account-name []

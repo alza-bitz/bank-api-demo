@@ -40,7 +40,8 @@
     (is (not (account/valid-account? {:id (random-uuid) :account-number 1 :name "Test" :balance -1}))))
 
   (testing "valid-account-event? returns true for valid event"
-    (let [event {:event-id 1
+    (let [event {:id (random-uuid)
+                 :sequence 1
                  :account-number 1
                  :description "deposit"
                  :timestamp (java.time.Instant/now)}]
@@ -48,7 +49,10 @@
 
   (testing "valid-account-event? returns false for invalid event"
     (is (not (account/valid-account-event?
-              {:event-id -1 :account-number 1 :description "deposit"
+              {:id (random-uuid)
+               :sequence -1
+               :account-number 1
+               :description "deposit"
                :timestamp (java.time.Instant/now)})))))
 
 (deftest generator-test

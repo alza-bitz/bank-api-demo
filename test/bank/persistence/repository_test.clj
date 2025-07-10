@@ -45,20 +45,20 @@
   
   (testing "save-account-event calls next.jdbc functions correctly and returns a valid account event"
     (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
-                                          (tx-fn ds)))
-                  sql/update! (spy/spy (fn [_ _ _ _]
-                                        1)) ; return number of rows updated
+                                           (tx-fn ds)))
+                  sql/update! (spy/spy (fn [_ _ _ _]))
                   sql/insert! (spy/spy (fn [_ _ data _]
-                                        {:event-id 1
-                                         :account-number (:account_number data) 
-                                         :description (:description data)
-                                         :timestamp (java.time.Instant/now)}))]
+                                         {:id (random-uuid)
+                                          :sequence 1
+                                          :account-number (:account_number data) 
+                                          :description (:description data)
+                                          :timestamp (java.time.Instant/now)}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
             account {:account-number 1 :name "Mr. Black" :balance 150}
             event {:account-number 1 :description "deposit"}
             saved-event (repo/save-account-event repo account event)]
-        (is (account/valid-account-event? saved-event))
+        (is (account/valid-saved-account-event? saved-event))
         (spy-assert/called-once? jdbc/transact)
-        (spy-assert/called-once? sql/update!)
+        (spy-assert/called-once? sql/update!) 
         (spy-assert/called-once? sql/insert!)
-        (is (= 1 (:event-id saved-event)))))))
+        (is (= 1 (:sequence saved-event)))))))

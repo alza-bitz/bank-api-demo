@@ -53,7 +53,8 @@
       )"])
     (jdbc/execute! logging-datasource
                    ["CREATE TABLE IF NOT EXISTS account_event (
-        event_id SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY,
+        event_sequence SERIAL NOT NULL UNIQUE,
         account_number INTEGER NOT NULL REFERENCES account(account_number),
         description VARCHAR(255) NOT NULL,
         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
