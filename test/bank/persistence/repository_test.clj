@@ -9,29 +9,31 @@
    [spy.core :as spy]))
 
 (deftest jdbc-repository-test
-  (testing "create-account calls next.jdbc functions correctly and returns a valid account"
+  (testing "save-account calls next.jdbc functions correctly and returns a valid account"
     (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
                                           (tx-fn ds)))
-                  sql/insert! (spy/spy (fn [_ _ data _]
-                                        {:account-number 1
-                                         :name (:name data)
+                  sql/insert! (spy/spy (fn [_ _ account _] 
+                                        {:id (:id account)
+                                         :account-number 1
+                                         :name "Mr. Black"
                                          :balance 0}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
-            account (repo/create-account repo "Mr. Black")]
-        (is (account/valid-account? account))
-        (is (= 1 (:account-number account)))
-        (is (= "Mr. Black" (:name account)))
-        (is (= 0 (:balance account)))
+            account (account/create-account "Mr. Black")
+            saved-account (repo/save-account repo account)]
+        (is (account/valid-saved-account? saved-account))
+        (is (= 1 (:account-number saved-account)))
+        (is (= "Mr. Black" (:name saved-account)))
+        (is (= 0 (:balance saved-account)))
         (spy-assert/called-once? jdbc/transact)
         (spy-assert/called-once? sql/insert!))))
   
   (testing "find-account calls next.jdbc functions correctly and returns a valid account"
     (with-redefs [sql/get-by-id (spy/spy (fn [_ _ id _ _]
                                           (when (= id 1)
-                                            {:account-number 1 :name "Mr. Black" :balance 100})))]
+                                            {:id (random-uuid) :account-number 1 :name "Mr. Black" :balance 100})))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
             account (repo/find-account repo 1)]
-        (is (account/valid-account? account))
+        (is (account/valid-saved-account? account))
         (is (= 1 (:account-number account)))
         (is (= "Mr. Black" (:name account)))
         (is (= 100 (:balance account)))

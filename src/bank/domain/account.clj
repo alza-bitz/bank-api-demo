@@ -1,6 +1,7 @@
 (ns bank.domain.account
   (:require [malli.core :as m]
-            [malli.generator :as mg]))
+            [malli.generator :as mg]
+            [malli.util :as mu]))
 
 ;; Account entity specs
 (def account-number-spec
@@ -14,9 +15,15 @@
 
 (def account-spec
   [:map
-   [:account-number account-number-spec]
+   [:id [:uuid]]
+   [:account-number {:optional true} account-number-spec]
    [:name account-name-spec]
    [:balance account-balance-spec]])
+
+(def saved-account-spec
+  (mu/merge
+    account-spec
+    [:map [:account-number account-number-spec]]))
 
 ;; Account event entity specs
 (def event-id-spec
@@ -35,10 +42,9 @@
 ;; Domain functions
 (defn create-account
   "Creates a new account with the given name and initial balance of 0."
-  [{:keys [account-number name]}]
-  {:pre [(m/validate account-number-spec account-number)
-         (m/validate account-name-spec name)]}
-  {:account-number account-number
+  [name]
+  {:pre [(m/validate account-name-spec name)]}
+  {:id (random-uuid)
    :name name
    :balance 0})
 
@@ -54,6 +60,9 @@
 ;; Validation functions
 (defn valid-account? [account]
   (m/validate account-spec account))
+
+(defn valid-saved-account? [account]
+  (m/validate saved-account-spec account))
 
 (defn valid-account-event? [event]
   (m/validate account-event-spec event))

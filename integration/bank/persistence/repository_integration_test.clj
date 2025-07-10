@@ -42,20 +42,21 @@
           (repo/drop-tables! datasource))))))
 
 (deftest jdbc-repository-test
-  (testing "create and find account with real database"
+  (testing "save and find account"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)]
 
-      ;; Create account
-      (let [created-account (repo/create-account repository "Mr. Black")]
-        (is (account/valid-account? created-account))
-        (is (= "Mr. Black" (:name created-account)))
-        (is (= 0 (:balance created-account)))
-        (is (pos? (:account-number created-account)))
+      ;; Save account
+      (let [account (account/create-account "Mr. Black")
+            saved-account (repo/save-account repository account)]
+        (is (account/valid-account? saved-account))
+        (is (= "Mr. Black" (:name saved-account)))
+        (is (= 0 (:balance saved-account)))
+        (is (pos? (:account-number saved-account)))
 
-        ;; Find the created account
-        (let [found-account (repo/find-account repository (:account-number created-account))]
-          (is (account/valid-account? found-account))
-          (is (= created-account found-account))))))
+        ;; Find the saved account
+        (let [found-account (repo/find-account repository (:account-number saved-account))]
+          (is (account/valid-saved-account? found-account))
+          (is (= saved-account found-account))))))
 
   (testing "find non-existent account returns nil"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)
@@ -63,11 +64,11 @@
       (is (nil? account)))))
 
 (deftest jdbc-repository-property-based-test
-  (testing "created accounts are always valid"
+  (testing "created accounts are always valid on save"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)]
       (dotimes [_ 10]
-        (let [name (account/gen-account-name)
-              created-account (repo/create-account repository name)]
-          (is (account/valid-account? created-account))
-          (is (= name (:name created-account)))
-          (is (= 0 (:balance created-account))))))))
+        (let [account (account/create-account (account/gen-account-name))
+              saved-account (repo/save-account repository account)]
+          (is (account/valid-saved-account? saved-account))
+          (is (= (:name account) (:name saved-account)))
+          (is (= 0 (:balance saved-account))))))))

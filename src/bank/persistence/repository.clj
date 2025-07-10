@@ -7,7 +7,7 @@
 
 (defprotocol AccountRepository
   "Repository interface for account operations."
-  (create-account [this account-name])
+  (save-account [this account])
   (find-account [this account-number])
   (save-account-event [this account event]))
 
@@ -18,10 +18,10 @@
 (defrecord JdbcAccountRepository [datasource]
   AccountRepository
 
-  (create-account [_ name]
+  (save-account [_ account]
     (jdbc/with-transaction [tx datasource]
-      (sql/insert! tx :account {:name name} {:return-keys true
-                                             :builder-fn rs->account})))
+      (sql/insert! tx :account account {:return-keys true
+                                        :builder-fn rs->account})))
 
   (find-account [_ account-number]
     (sql/get-by-id datasource :account account-number :account_number {:builder-fn rs->account}))
@@ -43,11 +43,13 @@
 (defn create-tables!
   "Creates the account and account_event tables."
   [datasource]
+  (println "Creating tables...")
   (jdbc/execute! datasource
                  ["CREATE TABLE IF NOT EXISTS account (
-        account_number SERIAL PRIMARY KEY,
+        id UUID PRIMARY KEY,
+        account_number SERIAL NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL,
-        balance INTEGER NOT NULL DEFAULT 0
+        balance INTEGER NOT NULL
       )"])
   (jdbc/execute! datasource
                  ["CREATE TABLE IF NOT EXISTS account_event (
@@ -55,7 +57,8 @@
         account_number INTEGER NOT NULL REFERENCES account(account_number),
         description VARCHAR(255) NOT NULL,
         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )"]))
+      )"])
+  (println "Tables created."))
 
 (defn drop-tables!
   "Drops the account and account_event tables."
