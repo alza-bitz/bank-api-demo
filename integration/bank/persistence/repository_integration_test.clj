@@ -56,16 +56,18 @@
 
       ;; Create account
       (let [created-account (repo/create-account repository "Mr. Black")]
+        (is (account/valid-account? created-account))
         (is (= "Mr. Black" (:name created-account)))
         (is (= 0 (:balance created-account)))
         (is (pos? (:account-number created-account)))
 
         ;; Find the created account
         (let [found-account (repo/find-account repository (:account-number created-account))]
+          (is (account/valid-account? found-account))
           (is (= created-account found-account))))))
 
   (testing "find non-existent account returns nil"
     (let [datasource (get-datasource)
           repository (repo/->JdbcAccountRepository datasource)
-          result (repo/find-account repository 999999)]
-      (is (nil? result)))))
+          account (repo/find-account repository 999999)]
+      (is (nil? account)))))
