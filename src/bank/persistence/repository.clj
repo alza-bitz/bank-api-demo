@@ -12,29 +12,22 @@
   (find-account [this account-number])
   (save-account-event [this account event]))
 
+(def rs->account rs/as-unqualified-kebab-maps)
+
 (defrecord JdbcAccountRepository [datasource]
   AccountRepository
 
   (create-account [_ name]
     (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
       (jdbc/with-transaction [tx logged-ds]
-        (let [result (sql/insert! tx :account {:name name}
-                                  {:return-keys true
-                                   :builder-fn rs/as-unqualified-lower-maps})
-              account-number (:account_number result)
-              balance (:balance result)]
-          {:account-number account-number
-           :name name
-           :balance balance}))))
+        (sql/insert! tx :account {:name name}
+                     {:return-keys true
+                      :builder-fn rs->account}))))
 
   (find-account [_ account-number]
     (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
-      (when-let [result (sql/get-by-id logged-ds :account account-number :account_number
-                                       {:builder-fn rs/as-unqualified-lower-maps})]
-        (-> result
-            (update :account_number int)
-            (update :balance int)
-            (set/rename-keys {:account_number :account-number})))))
+      (sql/get-by-id logged-ds :account account-number :account_number
+                     {:builder-fn rs->account})))
 
   (save-account-event [_ account event]
     (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]

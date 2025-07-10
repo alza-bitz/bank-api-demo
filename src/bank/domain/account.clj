@@ -64,6 +64,9 @@
   (m/validate account-event-spec event))
 
 ;; Generator functions for testing
+(defn gen-account-name []
+  (mg/generate account-name-spec))
+
 (defn gen-account []
   (mg/generate account-spec))
 

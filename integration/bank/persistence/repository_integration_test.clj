@@ -1,58 +1,49 @@
 (ns bank.persistence.repository-integration-test
   (:require [clojure.test :refer [deftest testing is use-fixtures]]
             [clj-test-containers.core :as tc]
-            [next.jdbc :as jdbc]
             [bank.persistence.repository :as repo]
             [bank.domain.account :as account]))
 
-;; PostgreSQL test container configuration
-(def postgres-container
-  (tc/create {:image-name "postgres:13"
-              :exposed-ports [5432]
-              :env-vars {"POSTGRES_DB" "testdb"
-                         "POSTGRES_USER" "testuser"
-                         "POSTGRES_PASSWORD" "testpass"}}))
-
-(def started-container (atom nil))
-
-(defn start-postgres! []
-  (reset! started-container (tc/start! postgres-container)))
-
-(defn stop-postgres! []
-  (when @started-container
-    (tc/stop! @started-container)))
-
-(defn get-datasource []
-  (let [port (get (:mapped-ports @started-container) 5432)]
-    {:dbtype "postgresql"
-     :host "localhost"
-     :port port
-     :dbname "testdb"
-     :user "testuser"
-     :password "testpass"}))
+(def ^:dynamic *container* nil)
 
 (use-fixtures :once
   (fn [f]
-    (start-postgres!)
-    (try
-      (Thread/sleep 2000)
-      (f)
-      (finally
-        (stop-postgres!)))))
+    (let [container (-> {:image-name "postgres:13"
+                         :exposed-ports [5432]
+                         :env-vars {"POSTGRES_DB" "testdb"
+                                    "POSTGRES_USER" "testuser"
+                                    "POSTGRES_PASSWORD" "testpass"}}
+                        tc/create
+                        tc/start!)]
+      (try
+        (binding [*container* container]
+          (f))
+        (finally
+          (tc/stop! container))))))
+
+(defn ->datasource [container]
+  {:dbtype "postgresql"
+   :host "localhost"
+   :port (get (:mapped-ports container) 5432)
+   :dbname "testdb"
+   :user "testuser"
+   :password "testpass"})
+
+(def ^:dynamic *datasource* nil)
 
 (use-fixtures :each
   (fn [f]
-    (let [datasource (get-datasource)]
+    (let [datasource (->datasource *container*)]
       (try
         (repo/create-tables! datasource)
-        (f)
+        (binding [*datasource* datasource]
+          (f))
         (finally
           (repo/drop-tables! datasource))))))
 
-(deftest jdbc-repository-integration-test
+(deftest jdbc-repository-test
   (testing "create and find account with real database"
-    (let [datasource (get-datasource)
-          repository (repo/->JdbcAccountRepository datasource)]
+    (let [repository (repo/->JdbcAccountRepository *datasource*)]
 
       ;; Create account
       (let [created-account (repo/create-account repository "Mr. Black")]
@@ -67,7 +58,16 @@
           (is (= created-account found-account))))))
 
   (testing "find non-existent account returns nil"
-    (let [datasource (get-datasource)
-          repository (repo/->JdbcAccountRepository datasource)
+    (let [repository (repo/->JdbcAccountRepository *datasource*)
           account (repo/find-account repository 999999)]
       (is (nil? account)))))
+
+(deftest jdbc-repository-property-based-test
+  (testing "created accounts are always valid"
+    (let [repository (repo/->JdbcAccountRepository *datasource*)]
+      (dotimes [_ 10]
+        (let [name (account/gen-account-name)
+              created-account (repo/create-account repository name)]
+          (is (account/valid-account? created-account))
+          (is (= name (:name created-account)))
+          (is (= 0 (:balance created-account))))))))
