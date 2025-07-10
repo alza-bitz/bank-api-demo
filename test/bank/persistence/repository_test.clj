@@ -54,9 +54,9 @@
                                           :description (:description data)
                                           :timestamp (:timestamp data)}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
-            account (account/create-account "Mr. Black")
-            event (account/create-account-event 1 "deposit")
-            saved-event (repo/save-account-event repo account event)]
+            mock-saved-account (assoc (account/create-account "Mr. Black") :account-number 1)
+            event (account/create-account-event "deposit")
+            saved-event (repo/save-account-event repo mock-saved-account event)]
         (is (account/valid-saved-account-event? saved-event))
         (spy-assert/called-once? jdbc/transact)
         (spy-assert/called-once? sql/update!) 

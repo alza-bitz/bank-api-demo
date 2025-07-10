@@ -34,7 +34,7 @@
                    {:account_number (:account-number account)})
       ;; Then insert the event
       (sql/insert! tx :account_event
-                   {:account_number (:account-number event)
+                   {:account_number (:account-number account)
                     :description (:description event)
                     :timestamp (:timestamp event)}
                    {:return-keys true

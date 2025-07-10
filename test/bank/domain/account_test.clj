@@ -15,18 +15,13 @@
 
 (deftest create-account-event-test
   (testing "creates account event with valid data"
-    (let [event (account/create-account-event 1 "deposit")]
-      (is (= 1 (:account-number event)))
+    (let [event (account/create-account-event "deposit")] 
       (is (= "deposit" (:description event)))
-      (is (inst? (:timestamp event)))))
-
-  (testing "validates account number"
-    (is (thrown? AssertionError
-                 (account/create-account-event 0 "deposit"))))
+      (is (inst? (:timestamp event))))) 
 
   (testing "validates description"
     (is (thrown? AssertionError
-                 (account/create-account-event 1 "")))))
+                 (account/create-account-event "")))))
 
 (deftest validation-test
   (testing "valid-account? returns true for valid account"
@@ -34,15 +29,12 @@
       (is (account/valid-account? account))))
 
   (testing "valid-account? returns false for invalid account"
-    (is (not (account/valid-account? {:id nil :account-number 1 :name "Test" :balance 100})))
-    (is (not (account/valid-account? {:id (random-uuid) :account-number -1 :name "Test" :balance 100})))
-    (is (not (account/valid-account? {:id (random-uuid) :account-number 1 :name "" :balance 100})))
-    (is (not (account/valid-account? {:id (random-uuid) :account-number 1 :name "Test" :balance -1}))))
+    (is (not (account/valid-account? {:id nil :name "Test" :balance 100})))
+    (is (not (account/valid-account? {:id (random-uuid) :name "" :balance 100})))
+    (is (not (account/valid-account? {:id (random-uuid) :name "Test" :balance -1}))))
 
   (testing "valid-account-event? returns true for valid event"
     (let [event {:id (random-uuid)
-                 :sequence 1
-                 :account-number 1
                  :description "deposit"
                  :timestamp (java.time.Instant/now)}]
       (is (account/valid-account-event? event))))
@@ -50,9 +42,7 @@
   (testing "valid-account-event? returns false for invalid event"
     (is (not (account/valid-account-event?
               {:id (random-uuid)
-               :sequence -1
-               :account-number 1
-               :description "deposit"
+               :description ""
                :timestamp (java.time.Instant/now)})))))
 
 (deftest generator-test

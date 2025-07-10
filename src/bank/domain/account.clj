@@ -16,14 +16,13 @@
 (def account-spec
   [:map
    [:id [:uuid]]
-   [:account-number {:optional true} account-number-spec]
    [:name account-name-spec]
    [:balance account-balance-spec]])
 
 (def saved-account-spec
   (mu/merge
-    account-spec
-    [:map [:account-number account-number-spec]]))
+   account-spec
+   [:map [:account-number account-number-spec]]))
 
 ;; Account event entity specs
 (def event-sequence-spec
@@ -35,15 +34,15 @@
 (def account-event-spec
   [:map
    [:id [:uuid]]
-   [:sequence {:optional true} event-sequence-spec]
-   [:account-number account-number-spec]
    [:description event-description-spec]
    [:timestamp inst?]])
 
 (def saved-account-event-spec
   (mu/merge
    account-event-spec
-   [:map [:sequence event-sequence-spec]]))
+   [:map
+    [:sequence event-sequence-spec]
+    [:account-number account-number-spec]]))
 
 ;; Domain functions
 (defn create-account
@@ -56,11 +55,9 @@
 
 (defn create-account-event
   "Creates a domain event for account operations."
-  [account-number description]
-  {:pre [(m/validate account-number-spec account-number)
-         (m/validate event-description-spec description)]}
+  [description]
+  {:pre [(m/validate event-description-spec description)]}
   {:id (random-uuid)
-   :account-number account-number
    :description description
    :timestamp (java.time.Instant/now)})
 
