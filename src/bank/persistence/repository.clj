@@ -3,7 +3,6 @@
             [next.jdbc.sql :as sql]
             [next.jdbc.result-set :as rs]
             [clojure.tools.logging :as log]
-            [clojure.set :as set]
             [integrant.core :as ig]))
 
 (defprotocol AccountRepository
@@ -14,35 +13,31 @@
 
 (def rs->account rs/as-unqualified-kebab-maps)
 
+(def rs->account-event rs/as-unqualified-kebab-maps)
+
 (defrecord JdbcAccountRepository [datasource]
   AccountRepository
 
   (create-account [_ name]
-    (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
-      (jdbc/with-transaction [tx logged-ds]
-        (sql/insert! tx :account {:name name}
-                     {:return-keys true
-                      :builder-fn rs->account}))))
+    (jdbc/with-transaction [tx datasource]
+      (sql/insert! tx :account {:name name} {:return-keys true
+                                             :builder-fn rs->account})))
 
   (find-account [_ account-number]
-    (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
-      (sql/get-by-id logged-ds :account account-number :account_number
-                     {:builder-fn rs->account})))
+    (sql/get-by-id datasource :account account-number :account_number {:builder-fn rs->account}))
 
   (save-account-event [_ account event]
-    (let [logged-ds (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))]
-      (jdbc/with-transaction [tx logged-ds]
-        ;; First update the account
-        (sql/update! tx :account
-                     (select-keys account [:balance])
-                     {:account_number (:account-number account)})
-        ;; Then insert the event
-        (sql/insert! tx :account_event
-                     {:account_number (:account-number event)
-                      :event_type (name (:event-type event))
-                      :event_data (pr-str (:event-data event))
-                      :timestamp (:timestamp event)}
-                     {:return-keys true})))))
+    (jdbc/with-transaction [tx datasource]
+      ;; First update the account
+      (sql/update! tx :account
+                   (select-keys account [:balance])
+                   {:account_number (:account-number account)})
+      ;; Then insert the event
+      (sql/insert! tx :account_event
+                   {:account_number (:account-number event)
+                    :description (:description event)}
+                   {:return-keys true
+                    :builder-fn rs->account-event}))))
 
 ;; Database schema functions
 (defn create-tables!
@@ -58,8 +53,7 @@
                  ["CREATE TABLE IF NOT EXISTS account_event (
         event_id SERIAL PRIMARY KEY,
         account_number INTEGER NOT NULL REFERENCES account(account_number),
-        event_type VARCHAR(50) NOT NULL,
-        event_data TEXT,
+        description VARCHAR(255) NOT NULL,
         timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )"]))
 
@@ -69,9 +63,15 @@
   (jdbc/execute! datasource ["DROP TABLE IF EXISTS account_event"])
   (jdbc/execute! datasource ["DROP TABLE IF EXISTS account"]))
 
+(defn logging-jdbc-account-repository
+  "Creates a JdbcAccountRepository with logging wrapped datasource."
+  [datasource]
+  (->JdbcAccountRepository
+   (jdbc/with-logging datasource #(log/info "SQL:" %1 "Params:" %2))))
+
 ;; Integrant methods
 (defmethod ig/init-key ::repository [_ {:keys [datasource]}]
-  (->JdbcAccountRepository datasource))
+  (logging-jdbc-account-repository datasource))
 
 (defmethod ig/halt-key! ::repository [_ _]
   ;; No cleanup needed for repository

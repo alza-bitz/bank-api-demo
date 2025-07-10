@@ -43,7 +43,7 @@
 
 (deftest jdbc-repository-test
   (testing "create and find account with real database"
-    (let [repository (repo/->JdbcAccountRepository *datasource*)]
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)]
 
       ;; Create account
       (let [created-account (repo/create-account repository "Mr. Black")]
@@ -58,13 +58,13 @@
           (is (= created-account found-account))))))
 
   (testing "find non-existent account returns nil"
-    (let [repository (repo/->JdbcAccountRepository *datasource*)
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
           account (repo/find-account repository 999999)]
       (is (nil? account)))))
 
 (deftest jdbc-repository-property-based-test
   (testing "created accounts are always valid"
-    (let [repository (repo/->JdbcAccountRepository *datasource*)]
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)]
       (dotimes [_ 10]
         (let [name (account/gen-account-name)
               created-account (repo/create-account repository name)]

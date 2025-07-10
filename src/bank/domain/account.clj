@@ -22,18 +22,14 @@
 (def event-id-spec
   [:int {:min 1}])
 
-(def event-type-spec
-  [:enum :account-created :account-viewed])
-
-(def event-data-spec
-  [:map-of :keyword :any])
+(def event-description-spec
+  [:string {:min 1 :max 255}])
 
 (def account-event-spec
   [:map
    [:event-id {:optional true} event-id-spec]
    [:account-number account-number-spec]
-   [:event-type event-type-spec]
-   [:event-data {:optional true} event-data-spec]
+   [:description event-description-spec]
    [:timestamp inst?]])
 
 ;; Domain functions
@@ -48,13 +44,12 @@
 
 (defn create-account-event
   "Creates a domain event for account operations."
-  [event-type account-number & [event-data]]
-  {:pre [(m/validate event-type-spec event-type)
-         (m/validate account-number-spec account-number)]}
-  (cond-> {:account-number account-number
-           :event-type event-type
-           :timestamp (java.time.Instant/now)}
-    event-data (assoc :event-data event-data)))
+  [account-number description]
+  {:pre [(m/validate account-number-spec account-number)
+         (m/validate event-description-spec description)]}
+  {:account-number account-number
+   :description description
+   :timestamp (java.time.Instant/now)})
 
 ;; Validation functions
 (defn valid-account? [account]

@@ -22,26 +22,18 @@
 
 (deftest create-account-event-test
   (testing "creates account event with valid data"
-    (let [event (account/create-account-event :account-created 1 {:name "Mr. Black"})]
+    (let [event (account/create-account-event 1 "deposit")]
       (is (= 1 (:account-number event)))
-      (is (= :account-created (:event-type event)))
-      (is (= {:name "Mr. Black"} (:event-data event)))
-      (is (inst? (:timestamp event)))))
-  
-  (testing "creates event without event data"
-    (let [event (account/create-account-event :account-viewed 1)]
-      (is (= 1 (:account-number event)))
-      (is (= :account-viewed (:event-type event)))
-      (is (nil? (:event-data event)))
-      (is (inst? (:timestamp event)))))
-  
-  (testing "validates event type"
-    (is (thrown? AssertionError 
-                 (account/create-account-event :invalid-event 1))))
+      (is (= "deposit" (:description event)))
+      (is (inst? (:timestamp event))))) 
   
   (testing "validates account number"
     (is (thrown? AssertionError 
-                 (account/create-account-event :account-created 0)))))
+                 (account/create-account-event 0 "deposit"))))
+  
+  (testing "validates event type"
+    (is (thrown? AssertionError
+                 (account/create-account-event 1 nil)))))
 
 (deftest validation-test
   (testing "valid-account? returns true for valid account"
@@ -56,13 +48,13 @@
   (testing "valid-account-event? returns true for valid event"
     (let [event {:event-id 1 
                  :account-number 1 
-                 :event-type :account-created 
+                 :description "deposit"
                  :timestamp (java.time.Instant/now)}]
       (is (account/valid-account-event? event))))
   
   (testing "valid-account-event? returns false for invalid event"
     (is (not (account/valid-account-event? 
-               {:event-id -1 :account-number 1 :event-type :account-created 
+               {:event-id -1 :account-number 1 :description "deposit"
                 :timestamp (java.time.Instant/now)})))))
 
 (deftest generator-test
