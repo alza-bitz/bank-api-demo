@@ -35,7 +35,8 @@
       ;; Then insert the event
       (sql/insert! tx :account_event
                    {:account_number (:account-number event)
-                    :description (:description event)}
+                    :description (:description event)
+                    :timestamp (:timestamp event)}
                    {:return-keys true
                     :builder-fn rs->account-event}))))
 
@@ -57,7 +58,7 @@
         event_sequence SERIAL NOT NULL UNIQUE,
         account_number INTEGER NOT NULL REFERENCES account(account_number),
         description VARCHAR(255) NOT NULL,
-        timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        timestamp TIMESTAMP NOT NULL
       )"])))
 
 (defn drop-tables!

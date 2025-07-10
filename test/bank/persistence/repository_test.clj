@@ -52,10 +52,10 @@
                                           :sequence 1
                                           :account-number (:account_number data) 
                                           :description (:description data)
-                                          :timestamp (java.time.Instant/now)}))]
+                                          :timestamp (:timestamp data)}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
-            account {:account-number 1 :name "Mr. Black" :balance 150}
-            event {:account-number 1 :description "deposit"}
+            account (account/create-account "Mr. Black")
+            event (account/create-account-event 1 "deposit")
             saved-event (repo/save-account-event repo account event)]
         (is (account/valid-saved-account-event? saved-event))
         (spy-assert/called-once? jdbc/transact)
