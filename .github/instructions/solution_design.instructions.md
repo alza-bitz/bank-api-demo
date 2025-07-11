@@ -6,6 +6,8 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 
 # All layers
 - Don't create any namespaces with the same name.
+- Don't create any code that leaves unused vars.
+- Don't create any code with redundant let expressions.
 - Use Integrant for dependency injection and system lifecycle management.
 - Use log4j2 for the logging implementation, and org.clojure/tools.logging for the logging api.
 

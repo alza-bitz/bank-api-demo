@@ -13,7 +13,8 @@
                          :exposed-ports [5432]
                          :env-vars {"POSTGRES_DB" "testdb"
                                     "POSTGRES_USER" "testuser"
-                                    "POSTGRES_PASSWORD" "testpass"}}
+                                    "POSTGRES_PASSWORD" "testpass"}
+                         :wait-for {:wait-strategy :port}}
                         tc/create
                         tc/start!)]
       (try
@@ -22,7 +23,8 @@
         (finally
           (tc/stop! container))))))
 
-(defn ->datasource [container]
+(defn ->datasource 
+  [container]
   {:dbtype "postgresql"
    :host "localhost"
    :port (get (:mapped-ports container) 5432)
@@ -31,7 +33,6 @@
    :password "testpass"})
 
 (defn ->connection-pool
-  "Creates a HikariCP connection pool for concurrent testing"
   [container]
   (let [config (doto (HikariConfig.)
                  (.setJdbcUrl (str "jdbc:postgresql://localhost:"

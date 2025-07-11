@@ -7,10 +7,10 @@
 (defprotocol AccountService
   "Application service interface for account operations."
   (create-account [this name])
-  (get-account [this account-number])
+  (retrieve-account [this account-number])
   (deposit-to-account [this account-number amount]))
 
-(defrecord DefaultAccountService [repository]
+(defrecord SyncAccountService [repository]
   AccountService
 
   (create-account [_ name]
@@ -18,9 +18,10 @@
     (let [account (domain/create-account name)]
       (repo/save-account repository account)))
 
-  (get-account [_ account-number]
-    (log/info "Getting account" account-number)
-    (repo/find-account repository account-number))
+  (retrieve-account [_ account-number]
+    (log/info "Retrieving account" account-number)
+    (or (repo/find-account repository account-number)
+        (throw (ex-info "Account not found" {:account-number account-number}))))
 
   (deposit-to-account [_ account-number amount]
     (log/info "Depositing" amount "to account" account-number)
@@ -32,7 +33,7 @@
 
 ;; Integrant methods
 (defmethod ig/init-key ::service [_ {:keys [repository]}]
-  (->DefaultAccountService repository))
+  (->SyncAccountService repository))
 
 (defmethod ig/halt-key! ::service [_ _]
   ;; No cleanup needed for service
