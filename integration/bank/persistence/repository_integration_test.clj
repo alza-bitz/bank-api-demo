@@ -73,42 +73,24 @@
           (is (= (:name account) (:name saved-account)))
           (is (= 0 (:balance saved-account))))))))
 
-(deftest account-event-sequence-number-test
+(deftest jdbc-repository-sequence-number-test
   (testing "account events get per-account sequence numbers starting from 1"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)
-          ;; Create two different accounts
           account1 (repo/save-account repository (account/create-account "Account 1"))
-          account2 (repo/save-account repository (account/create-account "Account 2"))]
-      
-      ;; Create events for account1
-      (let [[updated-account1-1 event1-1] (account/deposit account1 100)]
-        (let [saved-event1-1 (repo/save-account-event repository updated-account1-1 event1-1)]
-          (is (= 1 (:sequence saved-event1-1)))
-          (is (= (:account-number account1) (:account-number saved-event1-1)))))
-      
-      ;; Create events for account2 (should also start at 1)
-      (let [[updated-account2-1 event2-1] (account/deposit account2 200)]
-        (let [saved-event2-1 (repo/save-account-event repository updated-account2-1 event2-1)]
-          (is (= 1 (:sequence saved-event2-1)))
-          (is (= (:account-number account2) (:account-number saved-event2-1)))))
-      
-      ;; Create second event for account1 (should be sequence 2)
-      (let [updated-account1-2 (assoc account1 :balance 200)
-            [final-account1 event1-2] (account/deposit updated-account1-2 50)]
-        (let [saved-event1-2 (repo/save-account-event repository final-account1 event1-2)]
-          (is (= 2 (:sequence saved-event1-2)))
-          (is (= (:account-number account1) (:account-number saved-event1-2)))))
-      
-      ;; Create third event for account1 (should be sequence 3)
-      (let [updated-account1-3 (assoc account1 :balance 250)
-            [final-account1-2 event1-3] (account/deposit updated-account1-3 25)]
-        (let [saved-event1-3 (repo/save-account-event repository final-account1-2 event1-3)]
-          (is (= 3 (:sequence saved-event1-3)))
-          (is (= (:account-number account1) (:account-number saved-event1-3)))))
-      
-      ;; Create second event for account2 (should be sequence 2, independent of account1)
-      (let [updated-account2-2 (assoc account2 :balance 400)
-            [final-account2 event2-2] (account/deposit updated-account2-2 150)]
-        (let [saved-event2-2 (repo/save-account-event repository final-account2 event2-2)]
-          (is (= 2 (:sequence saved-event2-2)))
-          (is (= (:account-number account2) (:account-number saved-event2-2))))))))
+          account2 (repo/save-account repository (account/create-account "Account 2"))
+          updated-accounts [{:account-update (account/deposit account1 100) :expected-sequence 1}
+                            {:account-update (account/deposit account1 50) :expected-sequence 2}
+                            {:account-update (account/deposit account1 25) :expected-sequence 3}
+                            {:account-update (account/deposit account2 200) :expected-sequence 1}
+                            {:account-update (account/deposit account2 150) :expected-sequence 2}]
+          saved-events (mapv #(assoc % :saved-event
+                                     (repo/save-account-event repository
+                                                              (first (:account-update %))
+                                                              (second (:account-update %))))
+                             updated-accounts)]
+
+      (doseq [{:keys [saved-event expected-sequence account-update]} saved-events]
+        (is (= expected-sequence (:sequence saved-event))
+            (str "Expected sequence " expected-sequence " for account " (first account-update)))
+        (is (= (:account-number (first account-update)) (:account-number saved-event))
+            (str "Event should belong to account " (first account-update)))))))
