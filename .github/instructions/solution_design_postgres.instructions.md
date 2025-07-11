@@ -2,9 +2,6 @@
 applyTo: '**'
 ---
 
-# Application layer
-- Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers
-
 # Persistence layer
 - The repository will be updating or inserting on account and account_event tables.
 - The repository will use the next.jdbc library for all database operations.
@@ -32,3 +29,9 @@ applyTo: '**'
 - For account creation, the db transaction would only insert in account table 
 - For account view, the db transaction would only select from account table
 - For account events, the db transaction would update account table and insert in account_event table
+
+# Application layer
+- Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers
+
+# Interface layer
+- Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers

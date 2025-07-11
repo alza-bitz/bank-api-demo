@@ -38,6 +38,7 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - The HTTP API contract should match the endpoints in [problem_statement_and_requirements.instructions.md](problem_statement_and_requirements.instructions.md)
 - Use the Metosin libraries i.e. Reitit, Malli, Muuntaja, Jsonista for the web stack.
 - Use Malli to define specs for the HTTP API endpoint requests and responses.
+- Expose the HTTP API contract and endpoints using OpenAPI 3.x
 - 
 - Unit tests will mock the application layer functions.
 
