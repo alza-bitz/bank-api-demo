@@ -2,6 +2,7 @@
   (:require [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [next.jdbc.result-set :as rs]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
             [integrant.core :as ig]))
 
@@ -13,7 +14,14 @@
 
 (def rs->account rs/as-unqualified-kebab-maps)
 
-(def rs->account-event rs/as-unqualified-kebab-maps)
+(defn rs->account-event 
+  "Transform result set for account events, converting event_sequence to sequence"
+  [result-set options]
+  (let [label-fn (fn [label]
+                   (if (= "event_sequence" label)
+                     "sequence"
+                     (str/replace label #"_" "-")))]
+    (rs/as-unqualified-modified-maps result-set (assoc options :label-fn label-fn))))
 
 (defrecord JdbcAccountRepository [datasource]
   AccountRepository
@@ -32,13 +40,19 @@
       (sql/update! tx :account
                    (select-keys account [:balance])
                    {:account_number (:account-number account)})
-      ;; Then insert the event
-      (sql/insert! tx :account_event
-                   {:account_number (:account-number account)
-                    :description (:description event)
-                    :timestamp (:timestamp event)}
-                   {:return-keys true
-                    :builder-fn rs->account-event}))))
+      ;; Then insert the event using per-account sequence number
+      (jdbc/execute-one! tx
+                         ["INSERT INTO account_event (id, event_sequence, account_number, description, timestamp, debit, credit) 
+                           VALUES (?, (SELECT COALESCE(MAX(event_sequence), 0) + 1 FROM account_event WHERE account_number = ?), ?, ?, ?, ?, ?)"
+                          (:id event)
+                          (:account-number account)
+                          (:account-number account)
+                          (:description event)
+                          (java.sql.Timestamp/from (:timestamp event))
+                          (:debit (:action event))
+                          (:credit (:action event))]
+                         {:return-keys true
+                          :builder-fn rs->account-event}))))
 
 ;; Database schema functions
 (defn create-tables!
@@ -55,10 +69,13 @@
     (jdbc/execute! logging-datasource
                    ["CREATE TABLE IF NOT EXISTS account_event (
         id UUID PRIMARY KEY,
-        event_sequence SERIAL NOT NULL UNIQUE,
+        event_sequence INTEGER NOT NULL,
         account_number INTEGER NOT NULL REFERENCES account(account_number),
         description VARCHAR(255) NOT NULL,
-        timestamp TIMESTAMP NOT NULL
+        timestamp TIMESTAMP NOT NULL,
+        debit INTEGER,
+        credit INTEGER,
+        UNIQUE(event_sequence, account_number)
       )"])))
 
 (defn drop-tables!

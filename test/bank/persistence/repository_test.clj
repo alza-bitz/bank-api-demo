@@ -47,18 +47,43 @@
     (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
                                            (tx-fn ds)))
                   sql/update! (spy/spy (fn [_ _ _ _]))
-                  sql/insert! (spy/spy (fn [_ _ data _]
-                                         {:id (random-uuid)
-                                          :sequence 1
-                                          :account-number (:account_number data) 
-                                          :description (:description data)
-                                          :timestamp (:timestamp data)}))]
+                  jdbc/execute-one! (spy/spy (fn [_ _sql-and-params _]
+                                              {:id (random-uuid)
+                                               :sequence 1
+                                               :account-number 1
+                                               :description "deposit"
+                                               :timestamp (java.sql.Timestamp/from (java.time.Instant/now))
+                                               :credit 100}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
             mock-saved-account (assoc (account/create-account "Mr. Black") :account-number 1)
-            event (account/create-account-event "deposit")
-            saved-event (repo/save-account-event repo mock-saved-account event)]
+            mock-event (account/create-account-event "deposit" {:credit 100})
+            saved-event (repo/save-account-event repo mock-saved-account mock-event)]
         (is (account/valid-saved-account-event? saved-event))
         (spy-assert/called-once? jdbc/transact)
         (spy-assert/called-once? sql/update!) 
-        (spy-assert/called-once? sql/insert!)
+        (spy-assert/called-once? jdbc/execute-one!)
         (is (= 1 (:sequence saved-event)))))))
+
+(deftest deposit-event-with-credit-test
+  (testing "save-account-event with deposit event includes credit amount"
+    (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
+                                           (tx-fn ds)))
+                  sql/update! (spy/spy (fn [_ _ balance-update account-filter]
+                                        (is (= 100 (:balance balance-update)))
+                                        (is (= 1 (:account_number account-filter)))))
+                  jdbc/execute-one! (spy/spy (fn [_ _sql-and-params _]
+                                              {:id (random-uuid)
+                                               :sequence 1
+                                               :account-number 1
+                                               :description "deposit"
+                                               :timestamp (java.sql.Timestamp/from (java.time.Instant/now))
+                                               :credit 100}))]
+      (let [repo (repo/->JdbcAccountRepository "mock-datasource")
+            account (assoc (account/create-account "Deposit User") :account-number 1)
+            [updated-account deposit-event] (account/deposit account 100)
+            saved-event (repo/save-account-event repo updated-account deposit-event)]
+        (is (= 100 (:credit saved-event)))
+        (is (= "deposit" (:description saved-event)))
+        (spy-assert/called-once? jdbc/transact)
+        (spy-assert/called-once? sql/update!)
+        (spy-assert/called-once? jdbc/execute-one!)))))

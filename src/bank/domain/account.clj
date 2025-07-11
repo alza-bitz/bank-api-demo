@@ -31,18 +31,28 @@
 (def event-description-spec
   [:string {:min 1 :max 255}])
 
+;; a map that either has a :debit key or a :credit key, but not both
+(def event-action-spec
+  [:or
+   [:map {:closed true} [:debit [:int {:min 1}]]]
+   [:map {:closed true} [:credit [:int {:min 1}]]]])
+
 (def account-event-spec
   [:map
    [:id [:uuid]]
    [:description event-description-spec]
-   [:timestamp inst?]])
+   [:timestamp inst?]
+   [:action event-action-spec]])
 
 (def saved-account-event-spec
-  (mu/merge
-   account-event-spec
-   [:map
-    [:sequence event-sequence-spec]
-    [:account-number account-number-spec]]))
+  [:map
+   [:id [:uuid]]
+   [:description event-description-spec]
+   [:timestamp inst?]
+   [:sequence event-sequence-spec]
+   [:account-number account-number-spec]
+   [:credit {:optional true} [:int {:min 1}]]
+   [:debit {:optional true} [:int {:min 1}]]])
 
 ;; Domain functions
 (defn create-account
@@ -55,11 +65,13 @@
 
 (defn create-account-event
   "Creates a domain event for account operations."
-  [description]
-  {:pre [(m/validate event-description-spec description)]}
+  [description action]
+  {:pre [(m/validate event-description-spec description)
+         (m/validate event-action-spec action)]}
   {:id (random-uuid)
    :description description
-   :timestamp (java.time.Instant/now)})
+   :timestamp (java.time.Instant/now)
+   :action action})
 
 ;; Validation functions
 (defn valid-account? [account]
@@ -83,3 +95,13 @@
 
 (defn gen-account-event []
   (mg/generate account-event-spec))
+
+;; Domain actions
+(defn deposit
+  "Deposits amount to an account and returns [updated-account deposit-event].
+   Amount must be positive."
+  [account amount]
+  {:pre [(pos? amount)]}
+  (let [updated-account (update account :balance + amount)
+        deposit-event (create-account-event "deposit" {:credit amount})]
+    [updated-account deposit-event]))
