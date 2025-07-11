@@ -43,5 +43,6 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - Unit tests will mock the application layer functions.
 
 # System layer
+- System layer will include functions for starting and stopping the system including all dependencies.
 - System layer will include a main function to start the system.
 - System layer will include a shutdown hook to stop the system.
