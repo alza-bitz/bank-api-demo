@@ -2,7 +2,7 @@
 applyTo: '**'
 ---
 
-The solution design is based on the DDD approach.
+The solution design is loosely based on the DDD layered approach. The meaning of "loosely" will be explained in the following sections.
 
 # All layers
 - Don't create any namespaces with the same name.
@@ -12,15 +12,23 @@ The solution design is based on the DDD approach.
 # Domain layer
 - There is only one aggregate in the domain: the account, which is also the aggregate root.
 - The account aggregate also includes an account event entity in a 1:n relationship.
-- Accounts have global identity, based on an auto-incrementing number that will be provided by the persistence layer on transaction commit.
-- Account events have global identity, based on an auto-incrementing number that will be provided by the persistence layer on transaction commit.
-- Use Malli to define specs for accounts and account events.
-- Define functions to create domain events. For this problem, these will be account events.
+- Accounts have global identity based on a uuid that will be provided by the domain layer and an auto-incrementing account number that will be provided by the persistence layer on transaction commit.
+- Account events have global identity based on a uuid that will be provided by the domain layer, and also local identity based on a unique-per-account auto-incrementing sequence number that will be assigned by the persistence layer on transaction commit.
+- Account events are produced by the following actions: deposit, withdraw, transfer to, transfer from.
+- Account creation and account view do not produce account events.
+- Use the domain events pattern to provide a function for each account action that takes an account plus other relevant args and returns a corresponding account event.
+- Use Malli to define specs for accounts, account actions and account events.
+
+# Persistence layer
+- Use the DDD repository pattern.
+- The repository will have a function for saving accounts that takes an account and returns a saved account.
+- The repository will have a function for finding an account by account number that returns the account or nil if not found.
+- The repository will have a function for saving an account event that takes an account and the event and returns the saved account event.
 
 # Application layer
 - Application layer will initially be implemented using a synchronous API.
 - For account create or account view, just call the persistence layer repository.
-- For account events, use domain layer to create the account event and then call the persistence layer repository, passing account and event.
+- For account actions, use the domain layer to create the account event and then call the persistence layer repository, passing account and event.
 - 
 - Unit tests will mock the persistence layer functions.
 

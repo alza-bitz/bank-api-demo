@@ -6,20 +6,23 @@ applyTo: '**'
 - Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers
 
 # Persistence layer
-- Use the DDD repository pattern.
-- Repository will handle create account, view account, plus all domain events.
-- Repository will be updating or inserting on account, account_event tables.
-- Repository will then return event result.
-- Use the next.jdbc library for all database operations.
-- Use with-logging from next.jdbc to log the SQL and params before any database operations, and to log the results afterwards.
+- The repository will be updating or inserting on account and account_event tables.
+- The repository will use the next.jdbc library for all database operations.
+- The local identity for account events can be implemented using the following sql statement: `insert into account_event (event_sequence, account_number) select coalesce(max(event_sequence), 0) + 1, ? from account_event where account_number = ?`
+- For concurrent saving of events on the same account, the repository can catch any exception resulting from the unique constraint violation and retry the operation.
+- Table column names should match the [problem_statement_and_requirements.instructions.md](problem_statement_and_requirements.instructions.md) except for conversion to snake_case.
+- The repository should have a function that uses camel-snake-kebab to convert accounts and events into what next.jdbc calls "data hash maps" or "hash maps of columns and values", as needed.
+- The repository should use as-unqualified-kebab-maps from next.jdbc to convert result sets into accounts and account events as needed.
+- Any other differences between column names and the domain model should be handled by conversion functions in the repository.
+- Use with-logging from next.jdbc for logging any sql statements before database operations and for logging the result afterwards.
 - Avoid SQL strings unless absolutely necessary.
 - 
-- Unit tests should mock the next.jdbc functions and macros where possible.
+- Unit tests should mock the next.jdbc functions where possible.
 - Integration tests will use the real jdbc.next functions, backed by a Postgres container managed with clj-test-containers/clj-test-containers
-- Test containers should be made available to tests using use-fixtures and with-binding
-- Test containers should only be made available to tests after asserting a successful connection
-- To get the mapped port for a test container: `(get (:mapped-ports started-container) 5432)`
-- To stop a test container: `(tc/stop! started-container)`
+- The Postgres container should be made available as a test fixture with use-fixtures and with-binding
+- The Postgres container should only be made available to tests after asserting a successful connection
+- To get the mapped port for a test container use `(get (:mapped-ports started-container) source-port)`
+- To stop a test container use `(tc/stop! started-container)`
 
 
 - There are two tables, account and account_event
