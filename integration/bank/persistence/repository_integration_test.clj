@@ -85,12 +85,12 @@
                             {:account-update (account/deposit account2 150) :expected-sequence 2}]
           saved-events (mapv #(assoc % :saved-event
                                      (repo/save-account-event repository
-                                                              (first (:account-update %))
-                                                              (second (:account-update %))))
+                                                              (:account (:account-update %))
+                                                              (:event (:account-update %))))
                              updated-accounts)]
 
       (doseq [{:keys [saved-event expected-sequence account-update]} saved-events]
         (is (= expected-sequence (:sequence saved-event))
-            (str "Expected sequence " expected-sequence " for account " (first account-update)))
-        (is (= (:account-number (first account-update)) (:account-number saved-event))
-            (str "Event should belong to account " (first account-update)))))))
+            (str "Expected sequence " expected-sequence " for account " (:account account-update)))
+        (is (= (:account-number (:account account-update)) (:account-number saved-event))
+            (str "Event should belong to account " (:account account-update)))))))

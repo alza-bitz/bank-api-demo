@@ -25,7 +25,7 @@
   (deposit-to-account [_ account-number amount]
     (log/info "Depositing" amount "to account" account-number)
     (if-let [account (repo/find-account repository account-number)]
-      (let [[updated-account deposit-event] (domain/deposit account amount)]
+      (let [{updated-account :account  deposit-event :event} (domain/deposit account amount)]
         (repo/save-account-event repository updated-account deposit-event)
         updated-account)
       (throw (ex-info "Account not found" {:account-number account-number})))))

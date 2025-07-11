@@ -80,7 +80,7 @@
                                                :credit 100}))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
             account (assoc (account/create-account "Deposit User") :account-number 1)
-            [updated-account deposit-event] (account/deposit account 100)
+            {updated-account :account deposit-event :event} (account/deposit account 100)
             saved-event (repo/save-account-event repo updated-account deposit-event)]
         (is (= 100 (:credit saved-event)))
         (is (= "deposit" (:description saved-event)))

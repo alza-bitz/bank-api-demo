@@ -73,6 +73,22 @@
    :timestamp (java.time.Instant/now)
    :action action})
 
+(def account-update-spec
+  [:map
+   [:account account-spec]
+   [:event account-event-spec]])
+
+(defn deposit
+  "Deposits amount to an account and returns an account update.
+   Amount must be positive."
+  [account amount]
+  {:pre [(m/validate account-spec account)
+         (pos? amount)]}
+  (let [updated-account (update account :balance + amount)
+        deposit-event (create-account-event "deposit" {:credit amount})]
+    {:account updated-account
+     :event deposit-event}))
+
 ;; Validation functions
 (defn valid-account? [account]
   (m/validate account-spec account))
@@ -86,6 +102,9 @@
 (defn valid-saved-account-event? [event]
   (m/validate saved-account-event-spec event))
 
+(defn valid-account-update? [account-update]
+  (m/validate account-update-spec account-update))
+
 ;; Generator functions for testing
 (defn gen-account-name []
   (mg/generate account-name-spec))
@@ -95,13 +114,3 @@
 
 (defn gen-account-event []
   (mg/generate account-event-spec))
-
-;; Domain actions
-(defn deposit
-  "Deposits amount to an account and returns [updated-account deposit-event].
-   Amount must be positive."
-  [account amount]
-  {:pre [(pos? amount)]}
-  (let [updated-account (update account :balance + amount)
-        deposit-event (create-account-event "deposit" {:credit amount})]
-    [updated-account deposit-event]))

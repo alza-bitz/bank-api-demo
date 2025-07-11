@@ -16,6 +16,7 @@
 (deftest create-account-event-test
   (testing "creates account event with valid data"
     (let [event (account/create-account-event "deposit" {:credit 100})] 
+      (is (account/valid-account-event? event))
       (is (= "deposit" (:description event)))
       (is (= {:credit 100} (:action event)))
       (is (inst? (:timestamp event))))) 
@@ -51,7 +52,13 @@
     (is (not (account/valid-account-event?
               {:id (random-uuid)
                :description ""
-               :timestamp (java.time.Instant/now)})))))
+               :timestamp (java.time.Instant/now)
+               :action {:credit 100}})))
+    (is (not (account/valid-account-event?
+              {:id (random-uuid)
+               :description "deposit"
+               :timestamp (java.time.Instant/now)
+               :action {}})))))
 
 (deftest generator-test
   (testing "generators produce valid data"
@@ -75,12 +82,13 @@
 (deftest deposit-test
   (testing "deposit increases account balance"
     (let [account (account/create-account "Deposit Test User")
-          [updated-account deposit-event] (account/deposit account 100)]
-      (is (= 100 (:balance updated-account)))
-      (is (= "deposit" (:description deposit-event)))
-      (is (= {:credit 100} (:action deposit-event)))
-      (is (some? (:id deposit-event)))
-      (is (inst? (:timestamp deposit-event)))))
+          {:keys [account event] :as account-update} (account/deposit account 100)]
+      (is (account/valid-account-update? account-update))
+      (is (= 100 (:balance account)))
+      (is (= "deposit" (:description event)))
+      (is (= {:credit 100} (:action event)))
+      (is (some? (:id event)))
+      (is (inst? (:timestamp event)))))
 
   (testing "deposit validates positive amount"
     (let [account (account/create-account "Test User")]
@@ -91,7 +99,7 @@
 
   (testing "multiple deposits accumulate balance"
     (let [account (account/create-account "Multi Deposit User")
-          [account-after-first _] (account/deposit account 75)
-          [account-after-second _] (account/deposit account-after-first 125)]
-      (is (= 75 (:balance account-after-first)))
-      (is (= 200 (:balance account-after-second))))))
+          {first-account :account} (account/deposit account 75)
+          {second-account :account} (account/deposit first-account 125)]
+      (is (= 75 (:balance first-account)))
+      (is (= 200 (:balance second-account))))))
