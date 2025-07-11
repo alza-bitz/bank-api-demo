@@ -51,8 +51,8 @@
    [:timestamp inst?]
    [:sequence event-sequence-spec]
    [:account-number account-number-spec]
-   [:credit {:optional true} [:int {:min 1}]]
-   [:debit {:optional true} [:int {:min 1}]]])
+   [:credit {:optional true} [:maybe [:int {:min 1}]]]
+   [:debit {:optional true} [:maybe [:int {:min 1}]]]])
 
 ;; Domain functions
 (defn create-account

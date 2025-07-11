@@ -2,7 +2,8 @@
   (:require [clojure.test :refer [deftest testing is use-fixtures]]
             [clj-test-containers.core :as tc]
             [bank.persistence.repository :as repo]
-            [bank.domain.account :as account]))
+            [bank.domain.account :as account])
+  (:import [com.zaxxer.hikari HikariConfig HikariDataSource]))
 
 (def ^:dynamic *container* nil)
 
@@ -28,6 +29,20 @@
    :dbname "testdb"
    :user "testuser"
    :password "testpass"})
+
+(defn ->connection-pool
+  "Creates a HikariCP connection pool for concurrent testing"
+  [container]
+  (let [config (doto (HikariConfig.)
+                 (.setJdbcUrl (str "jdbc:postgresql://localhost:"
+                                   (get (:mapped-ports container) 5432)
+                                   "/testdb"))
+                 (.setUsername "testuser")
+                 (.setPassword "testpass")
+                 (.setMaximumPoolSize 20)
+                 (.setMinimumIdle 5)
+                 (.setConnectionTimeout 30000))]
+    (HikariDataSource. config)))
 
 (def ^:dynamic *datasource* nil)
 
@@ -73,7 +88,7 @@
           (is (= (:name account) (:name saved-account)))
           (is (= 0 (:balance saved-account))))))))
 
-(deftest jdbc-repository-sequence-number-test
+(deftest jdbc-repository-sequence-test
   (testing "account events get per-account sequence numbers starting from 1"
     (let [repository (repo/logging-jdbc-account-repository *datasource*)
           account1 (repo/save-account repository (account/create-account "Account 1"))
@@ -94,3 +109,25 @@
             (str "Expected sequence " expected-sequence " for account " (:account account-update)))
         (is (= (:account-number (:account account-update)) (:account-number saved-event))
             (str "Event should belong to account " (:account account-update)))))))
+
+(deftest jdbc-repository-concurrent-sequence-test
+  (testing "concurrent account events get correct sequence numbers with retry logic"
+    (let [pool (->connection-pool *container*)
+          repository (repo/logging-jdbc-account-repository pool)
+          account (repo/save-account repository (account/create-account "Concurrent Test Account"))
+          num-events 10
+          saved-event-futures (doall
+                               (repeatedly num-events
+                                           #(future
+                                              (let [{updated-account :account event :event} (account/deposit account 1)]
+                                                (repo/save-account-event repository updated-account event)))))
+          saved-events (mapv deref saved-event-futures)
+          sequences (mapv :sequence saved-events)]
+
+      (try
+        (is (= (set (map inc (range num-events))) (set sequences))
+            (str "Expected sequences 1-10, got: " (sort sequences)))
+        (is (every? #(= (:account-number account) (:account-number %)) saved-events))
+        (is (every? account/valid-saved-account-event? saved-events))
+        (finally
+          (.close pool))))))

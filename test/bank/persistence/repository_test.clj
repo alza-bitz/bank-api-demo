@@ -87,3 +87,32 @@
         (spy-assert/called-once? jdbc/transact)
         (spy-assert/called-once? sql/update!)
         (spy-assert/called-once? jdbc/execute-one!)))))
+
+(deftest save-account-event-retry-on-constraint-violation-test
+  (testing "save-account-event retries on PostgreSQL constraint violation and eventually succeeds"
+    (let [attempt (atom 0)]
+      (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
+                                             (tx-fn ds)))
+                    sql/update! (spy/spy (fn [_ _ _ _]))
+                    jdbc/execute-one! (spy/spy (fn [_ _sql-and-params _]
+                                                (swap! attempt inc)
+                                                (if (= @attempt 1)
+                                                  (throw (org.postgresql.util.PSQLException. 
+                                                          "simulating constraint violation"
+                                                          org.postgresql.util.PSQLState/UNIQUE_VIOLATION))
+                                                  {:id (random-uuid)
+                                                   :sequence 1
+                                                   :account-number 1
+                                                   :description "deposit"
+                                                   :timestamp (java.sql.Timestamp/from (java.time.Instant/now))
+                                                   :credit 100})))]
+        (let [repo (repo/->JdbcAccountRepository "mock-datasource")
+              mock-saved-account (assoc (account/create-account "Mr. Black") :account-number 1)
+              mock-event (account/create-account-event "deposit" {:credit 100})
+              saved-event (repo/save-account-event repo mock-saved-account mock-event)]
+          (is (account/valid-saved-account-event? saved-event))
+          (is (= 1 (:sequence saved-event)))
+          (is (= 2 @attempt) "Should have attempted twice")
+          (spy-assert/called-n-times? jdbc/transact 2)
+          (spy-assert/called-n-times? sql/update! 2)
+          (spy-assert/called-n-times? jdbc/execute-one! 2))))))
