@@ -103,3 +103,40 @@
           {second-account :account} (account/deposit first-account 125)]
       (is (= 75 (:balance first-account)))
       (is (= 200 (:balance second-account))))))
+
+(deftest withdraw-test
+  (testing "withdraw decreases account balance"
+    (let [account (assoc (account/create-account "Withdraw Test User") :balance 150)
+          {:keys [account event] :as account-update} (account/withdraw account 100)]
+      (is (account/valid-account-update? account-update))
+      (is (= 50 (:balance account)))
+      (is (= "withdraw" (:description event)))
+      (is (= {:debit 100} (:action event)))
+      (is (some? (:id event)))
+      (is (inst? (:timestamp event)))))
+
+  (testing "withdraw validates positive amount"
+    (let [account (assoc (account/create-account "Test User") :balance 100)]
+      (is (thrown? AssertionError
+                   (account/withdraw account 0)))
+      (is (thrown? AssertionError
+                   (account/withdraw account -50)))))
+
+  (testing "withdraw validates sufficient balance"
+    (let [account (assoc (account/create-account "Test User") :balance 50)]
+      (is (thrown? AssertionError
+                   (account/withdraw account 100)))))
+
+  (testing "withdraw can reduce balance to zero"
+    (let [account (assoc (account/create-account "Zero Balance User") :balance 75)
+          {updated-account :account} (account/withdraw account 75)]
+      (is (= 0 (:balance updated-account)))))
+
+  (testing "multiple withdraws reduce balance correctly"
+    (let [account (assoc (account/create-account "Multi Withdraw User") :balance 200)
+          {first-account :account} (account/withdraw account 50)
+          {second-account :account} (account/withdraw first-account 75)]
+      (is (= 150 (:balance first-account)))
+      (is (= 75 (:balance second-account))))))
+
+

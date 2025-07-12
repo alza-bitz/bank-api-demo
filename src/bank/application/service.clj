@@ -8,7 +8,8 @@
   "Application service interface for account operations."
   (create-account [this name])
   (retrieve-account [this account-number])
-  (deposit-to-account [this account-number amount]))
+  (deposit-to-account [this account-number amount])
+  (withdraw-from-account [this account-number amount]))
 
 (defrecord SyncAccountService [repository]
   AccountService
@@ -29,6 +30,16 @@
       (let [{updated-account :account  deposit-event :event} (domain/deposit account amount)]
         (repo/save-account-event repository updated-account deposit-event)
         updated-account)
+      (throw (ex-info "Account not found" {:account-number account-number}))))
+
+  (withdraw-from-account [_ account-number amount]
+    (log/info "Withdrawing" amount "from account" account-number)
+    (if-let [account (repo/find-account repository account-number)]
+      (if (>= (:balance account) amount)
+        (let [{updated-account :account withdraw-event :event} (domain/withdraw account amount)]
+          (repo/save-account-event repository updated-account withdraw-event)
+          updated-account)
+        (throw (ex-info "Insufficient funds" {:account-number account-number :balance (:balance account) :amount amount})))
       (throw (ex-info "Account not found" {:account-number account-number})))))
 
 ;; Integrant methods

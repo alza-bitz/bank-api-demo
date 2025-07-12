@@ -100,6 +100,56 @@
          :body {:error "internal-server-error"
                 :message "Failed to deposit to account"}}))))
 
+(defn withdraw-handler
+  "HTTP handler for withdrawing money from accounts."
+  [service]
+  (fn [request]
+    (try
+      (let [account-number (-> request :path-params :id Integer/parseInt)
+            body (:body-params request)
+            amount (:amount body)]
+        (log/info "HTTP: Withdrawing" amount "from account" account-number)
+        (if (api/valid-withdraw-request? body)
+          (let [account (service/withdraw-from-account service account-number amount)
+                response (api/account->response account)]
+            {:status 200
+             :body response})
+          {:status 400
+           :body {:error "bad-request"
+                  :message "Invalid request body"}}))
+      (catch NumberFormatException e
+        (log/warn e "HTTP: Invalid account number format")
+        {:status 400
+         :body {:error "bad-request"
+                :message "Invalid account number format"}})
+      (catch clojure.lang.ExceptionInfo e
+        (cond
+          (= "Account not found" (.getMessage e))
+          (do
+            (log/warn "HTTP: Account not found" (:account-number (ex-data e)))
+            {:status 404
+             :body {:error "not-found"
+                    :message "Account not found"}})
+          
+          (= "Insufficient funds" (.getMessage e))
+          (do
+            (log/warn "HTTP: Insufficient funds for withdrawal" (ex-data e))
+            {:status 400
+             :body {:error "insufficient-funds"
+                    :message "Insufficient funds for withdrawal"}})
+          
+          :else
+          (do
+            (log/error e "HTTP: Error withdrawing from account")
+            {:status 500
+             :body {:error "internal-server-error"
+                    :message "Failed to withdraw from account"}})))
+      (catch Exception e
+        (log/error e "HTTP: Error withdrawing from account")
+        {:status 500
+         :body {:error "internal-server-error"
+                :message "Failed to withdraw from account"}}))))
+
 (defrecord HttpHandlers [service]
   Object
   (toString [_] "HttpHandlers"))
@@ -109,7 +159,8 @@
   [service]
   {:create-account (create-account-handler service)
    :view-account (view-account-handler service)
-   :deposit (deposit-handler service)})
+   :deposit (deposit-handler service)
+   :withdraw (withdraw-handler service)})
 
 ;; Integrant methods
 (defmethod ig/init-key ::handlers [_ {:keys [service]}]

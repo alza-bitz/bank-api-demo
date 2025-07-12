@@ -33,6 +33,17 @@
    [:name domain/account-name-spec]
    [:balance domain/account-balance-spec]])
 
+;; Withdraw endpoint
+(def withdraw-request-spec
+  [:map {:closed true}
+   [:amount [:int {:min 1}]]])
+
+(def withdraw-response-spec
+  [:map {:closed true}
+   [:account-number domain/account-number-spec]
+   [:name domain/account-name-spec]
+   [:balance domain/account-balance-spec]])
+
 ;; Error response
 (def error-response-spec
   [:map {:closed true}
@@ -62,6 +73,12 @@
 
 (defn valid-deposit-response? [response]
   (m/validate deposit-response-spec response))
+
+(defn valid-withdraw-request? [request]
+  (m/validate withdraw-request-spec request))
+
+(defn valid-withdraw-response? [response]
+  (m/validate withdraw-response-spec response))
 
 (defn valid-error-response? [response]
   (m/validate error-response-spec response))

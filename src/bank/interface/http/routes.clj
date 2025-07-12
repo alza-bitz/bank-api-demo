@@ -75,7 +75,22 @@
                               :description "Account not found"}
                          500 {:body api/error-response-spec
                               :description "Internal server error"}}
-              :handler (:deposit handlers)}}]]]])
+              :handler (:deposit handlers)}}]
+     
+     ["/:id/withdraw"
+      {:post {:summary "Withdraw money from an account"
+              :description "Withdraws a positive amount of money from an existing bank account. The resulting balance must not fall below zero."
+              :parameters {:path [:map [:id :int]]
+                          :body api/withdraw-request-spec}
+              :responses {200 {:body api/withdraw-response-spec
+                              :description "Withdrawal completed successfully"}
+                         400 {:body api/error-response-spec
+                              :description "Invalid request or insufficient funds"}
+                         404 {:body api/error-response-spec
+                              :description "Account not found"}
+                         500 {:body api/error-response-spec
+                              :description "Internal server error"}}
+              :handler (:withdraw handlers)}}]]]])
 
 (defn create-router
   "Creates a Reitit router with the given handlers."

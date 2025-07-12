@@ -24,7 +24,20 @@
          :account-number 123
          :name "Test User"
          :balance (+ 100 amount)}
-        (throw (ex-info "Account not found" {:account-number account-number}))))))
+        (throw (ex-info "Account not found" {:account-number account-number}))))
+    (withdraw-from-account [_ account-number amount]
+      (cond
+        (not= account-number 123)
+        (throw (ex-info "Account not found" {:account-number account-number}))
+        
+        (> amount 100)
+        (throw (ex-info "Insufficient funds" {:account-number account-number :balance 100 :amount amount}))
+        
+        :else
+        {:id (random-uuid)
+         :account-number 123
+         :name "Test User"
+         :balance (- 100 amount)}))))
 
 (deftest create-account-handler-test
   (testing "successful account creation"
@@ -49,7 +62,8 @@
                            (create-account [_ _]
                              (throw (RuntimeException. "Database error")))
                            (retrieve-account [_ _] nil)
-                           (deposit-to-account [_ _ _] nil))
+                           (deposit-to-account [_ _ _] nil)
+                           (withdraw-from-account [_ _ _] nil))
           handler (handlers/create-account-handler failing-service)
           request {:body-params {:name "John Doe"}}
           response (handler request)]
@@ -88,7 +102,8 @@
                            (create-account [_ _] nil)
                            (retrieve-account [_ _]
                              (throw (RuntimeException. "Database error")))
-                           (deposit-to-account [_ _ _] nil))
+                           (deposit-to-account [_ _ _] nil)
+                           (withdraw-from-account [_ _ _] nil))
           handler (handlers/view-account-handler failing-service)
           request {:path-params {:id "123"}}
           response (handler request)]
@@ -139,7 +154,8 @@
                            (create-account [_ _] nil)
                            (retrieve-account [_ _] nil)
                            (deposit-to-account [_ _ _]
-                             (throw (RuntimeException. "Database error"))))
+                             (throw (RuntimeException. "Database error")))
+                           (withdraw-from-account [_ _ _] nil))
           handler (handlers/deposit-handler failing-service)
           request {:path-params {:id "123"}
                   :body-params {:amount 50}}
@@ -148,9 +164,72 @@
       (is (= "internal-server-error" (get-in response [:body :error])))
       (is (= "Failed to deposit to account" (get-in response [:body :message]))))))
 
+(deftest withdraw-handler-test
+  (testing "successful withdrawal"
+    (let [handler (handlers/withdraw-handler mock-service)
+          request {:path-params {:id "123"}
+                   :body-params {:amount 50}}
+          response (handler request)]
+      (is (= 200 (:status response)))
+      (is (= 123 (get-in response [:body :account-number])))
+      (is (= "Test User" (get-in response [:body :name])))
+      (is (= 50 (get-in response [:body :balance])))))
+
+  (testing "invalid account number format"
+    (let [handler (handlers/withdraw-handler mock-service)
+          request {:path-params {:id "abc"}
+                   :body-params {:amount 50}}
+          response (handler request)]
+      (is (= 400 (:status response)))
+      (is (= "bad-request" (get-in response [:body :error])))
+      (is (= "Invalid account number format" (get-in response [:body :message])))))
+
+  (testing "invalid request body"
+    (let [handler (handlers/withdraw-handler mock-service)
+          request {:path-params {:id "123"}
+                   :body-params {}}
+          response (handler request)]
+      (is (= 400 (:status response)))
+      (is (= "bad-request" (get-in response [:body :error])))
+      (is (= "Invalid request body" (get-in response [:body :message])))))
+
+  (testing "insufficient funds"
+    (let [handler (handlers/withdraw-handler mock-service)
+          request {:path-params {:id "123"}
+                   :body-params {:amount 150}}
+          response (handler request)]
+      (is (= 400 (:status response)))
+      (is (= "insufficient-funds" (get-in response [:body :error])))
+      (is (= "Insufficient funds for withdrawal" (get-in response [:body :message])))))
+
+  (testing "account not found"
+    (let [handler (handlers/withdraw-handler mock-service)
+          request {:path-params {:id "999"}
+                   :body-params {:amount 50}}
+          response (handler request)]
+      (is (= 404 (:status response)))
+      (is (= "not-found" (get-in response [:body :error])))
+      (is (= "Account not found" (get-in response [:body :message])))))
+
+  (testing "service exception handling"
+    (let [failing-service (reify service/AccountService
+                           (create-account [_ _] nil)
+                           (retrieve-account [_ _] nil)
+                           (deposit-to-account [_ _ _] nil)
+                           (withdraw-from-account [_ _ _]
+                             (throw (RuntimeException. "Database error"))))
+          handler (handlers/withdraw-handler failing-service)
+          request {:path-params {:id "123"}
+                   :body-params {:amount 50}}
+          response (handler request)]
+      (is (= 500 (:status response)))
+      (is (= "internal-server-error" (get-in response [:body :error])))
+      (is (= "Failed to withdraw from account" (get-in response [:body :message]))))))
+
 (deftest make-handlers-test
   (testing "make-handlers returns all expected handlers"
     (let [handlers (handlers/make-handlers mock-service)]
       (is (fn? (:create-account handlers)))
       (is (fn? (:view-account handlers)))
-      (is (fn? (:deposit handlers))))))
+      (is (fn? (:deposit handlers)))
+      (is (fn? (:withdraw handlers))))))

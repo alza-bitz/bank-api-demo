@@ -86,3 +86,59 @@
            (service/deposit-to-account service 999 100)))
       (is (spy/called-once? find-account-spy)))))
 
+(deftest withdraw-from-account-test
+  (testing "withdraws from existing account with sufficient funds"
+    (let [existing-account {:id (random-uuid)
+                            :account-number 123
+                            :name "John Doe"
+                            :balance 200}
+          find-account-spy (spy/spy (constantly existing-account))
+          save-account-event-spy (spy/spy (fn [_repo account _event] account))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account [_this account] account)
+                      (save-account-event [this account event]
+                        (save-account-event-spy this account event)))
+          service (service/->SyncAccountService mock-repo)
+          updated-account (service/withdraw-from-account service 123 75)]
+
+      (is (= 125 (:balance updated-account)))
+      (is (spy/called-once? find-account-spy))
+      (is (spy/called-with? find-account-spy 123))
+      (is (spy/called-once? save-account-event-spy))))
+
+  (testing "throws exception for insufficient funds"
+    (let [existing-account {:id (random-uuid)
+                            :account-number 123
+                            :name "John Doe"
+                            :balance 50}
+          find-account-spy (spy/spy (constantly existing-account))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account))
+          service (service/->SyncAccountService mock-repo)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Insufficient funds"
+           (service/withdraw-from-account service 123 100)))
+      (is (spy/called-once? find-account-spy))))
+
+  (testing "throws exception for non-existent account"
+    (let [find-account-spy (spy/spy (constantly nil))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account))
+          service (service/->SyncAccountService mock-repo)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/withdraw-from-account service 999 100)))
+      (is (spy/called-once? find-account-spy)))))
+

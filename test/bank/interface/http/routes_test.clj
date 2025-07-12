@@ -7,7 +7,8 @@
   "Mock handlers for testing routes."
   {:create-account (fn [_] {:status 200 :body {:account-number 123}})
    :view-account (fn [_] {:status 200 :body {:account-number 123}})
-   :deposit (fn [_] {:status 200 :body {:account-number 123}})})
+   :deposit (fn [_] {:status 200 :body {:account-number 123}})
+   :withdraw (fn [_] {:status 200 :body {:account-number 123}})})
 
 (deftest create-routes-test
   (testing "routes structure"
@@ -30,7 +31,8 @@
   (testing "route handlers are properly assigned"
     (let [test-handlers {:create-account (constantly {:status 201})
                         :view-account (constantly {:status 200})
-                        :deposit (constantly {:status 202})}
+                        :deposit (constantly {:status 202})
+                        :withdraw (constantly {:status 203})}
           router (routes/create-router test-handlers)]
       
       ;; Test that the router was created successfully

@@ -89,6 +89,18 @@
     {:account updated-account
      :event deposit-event}))
 
+(defn withdraw
+  "Withdraws amount from an account and returns an account update.
+   Amount must be positive and resulting balance must not be negative."
+  [account amount]
+  {:pre [(m/validate account-spec account)
+         (pos? amount)
+         (>= (:balance account) amount)]}
+  (let [updated-account (update account :balance - amount)
+        withdraw-event (create-account-event "withdraw" {:debit amount})]
+    {:account updated-account
+     :event withdraw-event}))
+
 ;; Validation functions
 (defn valid-account? [account]
   (m/validate account-spec account))
