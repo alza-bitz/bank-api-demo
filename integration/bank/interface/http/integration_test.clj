@@ -6,8 +6,7 @@
    [bank.persistence.repository :as repo]
    [clj-test-containers.core :as tc]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [jsonista.core :as json]
-   [reitit.ring :as ring]))
+   [jsonista.core :as json]))
 
 (def ^:dynamic *datasource* nil)
 
@@ -135,6 +134,7 @@
         (is (contains? body "humanized"))
         (is (contains? (get body "humanized") "amount"))
         (is (= ["should be at least 1"] (get-in body ["humanized" "amount"])))))))
+
 (deftest withdraw-integration-test
   (testing "end-to-end withdraw with sufficient funds"
     (let [;; First create an account and deposit money
@@ -208,3 +208,69 @@
         (is (contains? body "humanized"))
         (is (contains? (get body "humanized") "amount"))
         (is (= ["should be at least 1"] (get-in body ["humanized" "amount"])))))))
+
+(deftest audit-log-integration-test
+  (testing "end-to-end audit log with multiple transactions"
+    (let [;; Create account and perform transactions
+          created-account (service/create-account *service* "Audit User")
+          account-number (:account-number created-account)
+          _ (service/deposit-to-account *service* account-number 1000)
+          _ (service/withdraw-from-account *service* account-number 200)
+          _ (service/deposit-to-account *service* account-number 300)
+
+          ;; Retrieve audit log via HTTP
+          request {:request-method :get
+                   :uri (str "/account/" account-number "/audit")}
+          response (*handler* request)]
+
+      (is (= 200 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (vector? body))
+        (is (= 3 (count body)))
+        
+        ;; Check reverse chronological order
+        (let [[latest second-latest oldest] body]
+          ;; Latest: deposit 300
+          (is (= 3 (get latest "sequence")))
+          (is (= 300 (get latest "credit")))
+          (is (= "deposit" (get latest "description")))
+          (is (nil? (get latest "debit")))
+          
+          ;; Second latest: withdraw 200
+          (is (= 2 (get second-latest "sequence")))
+          (is (= 200 (get second-latest "debit")))
+          (is (= "withdraw" (get second-latest "description")))
+          (is (nil? (get second-latest "credit")))
+          
+          ;; Oldest: deposit 1000
+          (is (= 1 (get oldest "sequence")))
+          (is (= 1000 (get oldest "credit")))
+          (is (= "deposit" (get oldest "description")))
+          (is (nil? (get oldest "debit"))))))))
+
+(deftest audit-log-empty-integration-test
+  (testing "empty audit log for account with no transactions"
+    (let [;; Create account with no transactions
+          created-account (service/create-account *service* "No Transactions User")
+          account-number (:account-number created-account)
+
+          ;; Retrieve audit log via HTTP
+          request {:request-method :get
+                   :uri (str "/account/" account-number "/audit")}
+          response (*handler* request)]
+
+      (is (= 200 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (vector? body))
+        (is (= 0 (count body)))))))
+
+(deftest audit-log-account-not-found-integration-test
+  (testing "404 error for audit log of non-existent account"
+    (let [request {:request-method :get
+                   :uri "/account/999999/audit"}
+          response (*handler* request)]
+
+      (is (= 404 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "account-not-found" (get body "error")))
+        (is (= "Account not found" (get body "message")))))))

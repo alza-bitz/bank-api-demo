@@ -159,3 +159,60 @@
            (service/withdraw-from-account service 999 100)))
       (is (spy/called-once? find-account-spy)))))
 
+(deftest retrieve-account-audit-test
+  (testing "retrieves account audit log through service"
+    (let [existing-account {:id (random-uuid)
+                            :account-number 123
+                            :name "John Doe"
+                            :balance 200}
+          account-events [{:id (random-uuid)
+                           :sequence 2
+                           :account-number 123
+                           :description "withdraw"
+                           :debit 50
+                           :credit nil
+                           :timestamp (java.sql.Timestamp/from (java.time.Instant/now))}
+                          {:id (random-uuid)
+                           :sequence 1
+                           :account-number 123
+                           :description "deposit"
+                           :debit nil
+                           :credit 100
+                           :timestamp (java.sql.Timestamp/from (java.time.Instant/now))}]
+          find-account-spy (spy/spy (constantly existing-account))
+          find-account-events-spy (spy/spy (constantly account-events))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (find-account-events [_this account-number]
+                        (find-account-events-spy account-number))
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account))
+          service (service/->SyncAccountService mock-repo)
+          audit-events (service/retrieve-account-audit service 123)]
+
+      (is (= account-events audit-events))
+      (is (spy/called-once? find-account-spy))
+      (is (spy/called-with? find-account-spy 123))
+      (is (spy/called-once? find-account-events-spy))
+      (is (spy/called-with? find-account-events-spy 123))))
+
+  (testing "throws exception for non-existent account"
+    (let [find-account-spy (spy/spy (fn [account-number]
+                                     (throw (ex-info "Account not found" 
+                                                    {:error :account-not-found 
+                                                     :account-number account-number}))))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (find-account-events [_this _account-number] [])
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account))
+          service (service/->SyncAccountService mock-repo)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/retrieve-account-audit service 999)))
+      (is (spy/called-once? find-account-spy)))))
+

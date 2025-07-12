@@ -136,3 +136,72 @@
         (is (every? account/valid-saved-account-event? saved-events))
         (finally
           (.close pool))))))
+
+(deftest find-account-events-integration-test
+  (testing "find-account-events returns events in reverse chronological order"
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
+          account (repo/save-account repository (account/create-account "Events Test User"))
+          account-number (:account-number account)
+          deposit-update (account/deposit account 100)
+          withdraw-update (account/withdraw (:account deposit-update) 25)
+          deposit2-update (account/deposit (:account withdraw-update) 50)]
+      
+      ;; Save events
+      (repo/save-account-event repository (:account deposit-update) (:event deposit-update))
+      (repo/save-account-event repository (:account withdraw-update) (:event withdraw-update))
+      (repo/save-account-event repository (:account deposit2-update) (:event deposit2-update))
+      
+      ;; Retrieve events
+      (let [events (repo/find-account-events repository account-number)]
+        (is (= 3 (count events)))
+        
+        ;; Check reverse chronological order (latest first)
+        (let [sequences (map :sequence events)]
+          (is (= [3 2 1] sequences) "Events should be in reverse chronological order"))
+        
+        ;; Check event data
+        (is (every? account/valid-saved-account-event? events))
+
+        ;; Verify first event is the most recent (second deposit)
+        (is (= "deposit" (:description (first events))))
+        (is (= 50 (:credit (first events))))
+        (is (nil? (:debit (first events)))))))
+
+  (testing "find-account-events for non-existent account returns empty list"
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
+          events (repo/find-account-events repository 999999)]
+      (is (empty? events))))
+
+  (testing "find-account-events for account with no events returns empty list"
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
+          account (repo/save-account repository (account/create-account "No Events User"))
+          events (repo/find-account-events repository (:account-number account))]
+      (is (empty? events))))
+
+  (testing "find-account-events isolates events between different accounts"
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)
+          account1 (repo/save-account repository (account/create-account "User 1"))
+          account2 (repo/save-account repository (account/create-account "User 2"))]
+      
+      ;; Add events to each account
+      (let [deposit1 (account/deposit account1 100)
+            deposit2 (account/deposit account2 200)]
+        (repo/save-account-event repository (:account deposit1) (:event deposit1))
+        (repo/save-account-event repository (:account deposit2) (:event deposit2)))
+      
+      ;; Verify separate event logs
+      (let [events1 (repo/find-account-events repository (:account-number account1))
+            events2 (repo/find-account-events repository (:account-number account2))]
+        
+        (is (= 1 (count events1)))
+        (is (= 1 (count events2)))
+        
+        ;; Verify events are account-specific
+        (is (= 100 (:credit (first events1))))
+        (is (= 200 (:credit (first events2))))
+        (is (= "deposit" (:description (first events1))))
+        (is (= "deposit" (:description (first events2))))
+        
+        ;; Verify sequence numbers are independent
+        (is (= 1 (:sequence (first events1))))
+        (is (= 1 (:sequence (first events2))))))))

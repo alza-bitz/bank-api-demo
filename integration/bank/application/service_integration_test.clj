@@ -94,3 +94,50 @@
       (service/deposit-to-account service account-number 30)
       (let [final-account (service/retrieve-account service account-number)]
         (is (= 80 (:balance final-account)))))))
+
+(deftest account-audit-service-integration-test
+  (testing "retrieve account audit end-to-end"
+    (let [service (service/->SyncAccountService *repository*)
+          created-account (service/create-account service "Audit Test User")
+          account-number (:account-number created-account)]
+      
+      ;; Initially, audit log should be empty
+      (let [initial-events (service/retrieve-account-audit service account-number)]
+        (is (empty? initial-events)))
+      
+      ;; Perform some transactions
+      (service/deposit-to-account service account-number 100)
+      (service/deposit-to-account service account-number 50)
+      (service/withdraw-from-account service account-number 25)
+      
+      ;; Check audit log
+      (let [events (service/retrieve-account-audit service account-number)]
+        (is (= 3 (count events)))
+        
+        ;; Should be in reverse chronological order
+        (is (= 3 (:sequence (first events)))) ; withdraw event (latest)
+        (is (= 2 (:sequence (second events)))) ; second deposit event
+        (is (= 1 (:sequence (nth events 2)))) ; first deposit event (earliest)
+        
+        ;; Verify event details
+        (is (= "withdraw" (:description (first events))))
+        (is (= 25 (:debit (first events))))
+        (is (nil? (:credit (first events))))
+        
+        (is (= "deposit" (:description (second events))))
+        (is (= 50 (:credit (second events))))
+        (is (nil? (:debit (second events))))
+        
+        (is (= "deposit" (:description (nth events 2))))
+        (is (= 100 (:credit (nth events 2))))
+        (is (nil? (:debit (nth events 2))))
+        
+        ;; All events should belong to the same account
+        (is (every? #(= account-number (:account-number %)) events)))))
+
+  (testing "retrieve account audit for non-existent account throws exception"
+    (let [service (service/->SyncAccountService *repository*)]
+      (is (thrown-with-msg? 
+           clojure.lang.ExceptionInfo 
+           #"Account not found"
+           (service/retrieve-account-audit service 999999))))))

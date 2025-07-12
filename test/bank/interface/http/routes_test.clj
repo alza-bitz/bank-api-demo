@@ -8,7 +8,8 @@
   {:create-account (fn [_] {:status 200 :body {:account-number 123}})
    :view-account (fn [_] {:status 200 :body {:account-number 123}})
    :deposit (fn [_] {:status 200 :body {:account-number 123}})
-   :withdraw (fn [_] {:status 200 :body {:account-number 123}})})
+   :withdraw (fn [_] {:status 200 :body {:account-number 123}})
+   :audit (fn [_] {:status 200 :body []})})
 
 (deftest create-routes-test
   (testing "routes structure"
@@ -28,11 +29,11 @@
       (is (fn? app)))))
 
 (deftest route-handlers-test
-  (testing "route handlers are properly assigned"
-    (let [test-handlers {:create-account (constantly {:status 201})
+  (testing "route handlers are properly assigned"      (let [test-handlers {:create-account (constantly {:status 201})
                         :view-account (constantly {:status 200})
                         :deposit (constantly {:status 202})
-                        :withdraw (constantly {:status 203})}
+                        :withdraw (constantly {:status 203})
+                        :audit (constantly {:status 204})}
           router (routes/create-router test-handlers)]
       
       ;; Test that the router was created successfully

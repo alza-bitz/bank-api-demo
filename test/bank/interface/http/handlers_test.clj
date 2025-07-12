@@ -37,7 +37,18 @@
         {:id (random-uuid)
          :account-number 123
          :name "Test User"
-         :balance (- 100 amount)}))))
+         :balance (- 100 amount)}))
+    (retrieve-account-audit [_ account-number]
+      (if (= account-number 123)
+        [{:sequence 2
+          :description "withdraw"
+          :debit 50
+          :credit nil}
+         {:sequence 1
+          :description "deposit"
+          :debit nil
+          :credit 100}]
+        (throw (ex-info "Account not found" {:error :account-not-found :account-number account-number}))))))
 
 (deftest create-account-handler-test
   (testing "successful account creation"
@@ -63,7 +74,8 @@
                              (throw (RuntimeException. "Database error")))
                            (retrieve-account [_ _] nil)
                            (deposit-to-account [_ _ _] nil)
-                           (withdraw-from-account [_ _ _] nil))
+                           (withdraw-from-account [_ _ _] nil)
+                           (retrieve-account-audit [_ _] nil))
           handler (handlers/create-account-handler failing-service)
           request {:body-params {:name "John Doe"}}
           response (handler request)]
@@ -103,7 +115,8 @@
                            (retrieve-account [_ _]
                              (throw (RuntimeException. "Database error")))
                            (deposit-to-account [_ _ _] nil)
-                           (withdraw-from-account [_ _ _] nil))
+                           (withdraw-from-account [_ _ _] nil)
+                           (retrieve-account-audit [_ _] nil))
           handler (handlers/view-account-handler failing-service)
           request {:path-params {:id "123"}}
           response (handler request)]
@@ -155,7 +168,8 @@
                            (retrieve-account [_ _] nil)
                            (deposit-to-account [_ _ _]
                              (throw (RuntimeException. "Database error")))
-                           (withdraw-from-account [_ _ _] nil))
+                           (withdraw-from-account [_ _ _] nil)
+                           (retrieve-account-audit [_ _] nil))
           handler (handlers/deposit-handler failing-service)
           request {:path-params {:id "123"}
                   :body-params {:amount 50}}
@@ -217,7 +231,8 @@
                            (retrieve-account [_ _] nil)
                            (deposit-to-account [_ _ _] nil)
                            (withdraw-from-account [_ _ _]
-                             (throw (RuntimeException. "Database error"))))
+                             (throw (RuntimeException. "Database error")))
+                           (retrieve-account-audit [_ _] nil))
           handler (handlers/withdraw-handler failing-service)
           request {:path-params {:id "123"}
                    :body-params {:amount 50}}
@@ -232,4 +247,42 @@
       (is (fn? (:create-account handlers)))
       (is (fn? (:view-account handlers)))
       (is (fn? (:deposit handlers)))
-      (is (fn? (:withdraw handlers))))))
+      (is (fn? (:withdraw handlers)))
+      (is (fn? (:audit handlers))))))
+
+(deftest audit-handler-test
+  (testing "successful audit retrieval"
+    (let [handler (handlers/audit-handler mock-service)
+          request {:path-params {:id "123"}}
+          response (handler request)]
+      (is (= 200 (:status response)))
+      (is (= 2 (count (:body response))))
+      (is (= 2 (get-in response [:body 0 :sequence])))
+      (is (= "withdraw" (get-in response [:body 0 :description])))
+      (is (= 50 (get-in response [:body 0 :debit])))
+      (is (= 1 (get-in response [:body 1 :sequence])))
+      (is (= "deposit" (get-in response [:body 1 :description])))
+      (is (= 100 (get-in response [:body 1 :credit])))))
+
+  (testing "account not found"
+    (let [handler (handlers/audit-handler mock-service)
+          request {:path-params {:id "999"}}
+          response (handler request)]
+      (is (= 404 (:status response)))
+      (is (= "account-not-found" (get-in response [:body :error])))
+      (is (= "Account not found" (get-in response [:body :message])))))
+
+  (testing "service exception handling"
+    (let [failing-service (reify service/AccountService
+                           (create-account [_ _] nil)
+                           (retrieve-account [_ _] nil)
+                           (deposit-to-account [_ _ _] nil)
+                           (withdraw-from-account [_ _ _] nil)
+                           (retrieve-account-audit [_ _]
+                             (throw (RuntimeException. "Database error"))))
+          handler (handlers/audit-handler failing-service)
+          request {:path-params {:id "123"}}
+          response (handler request)]
+      (is (= 500 (:status response)))
+      (is (= "internal-server-error" (get-in response [:body :error])))
+      (is (= "Failed to retrieve audit log" (get-in response [:body :message]))))))

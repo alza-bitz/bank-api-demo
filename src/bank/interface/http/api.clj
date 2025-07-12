@@ -44,6 +44,17 @@
    [:name domain/account-name-spec]
    [:balance domain/account-balance-spec]])
 
+;; Audit endpoint
+(def audit-response-item-spec
+  [:map {:closed true}
+   [:sequence [:int {:min 0}]]
+   [:description [:string {:min 1}]]
+   [:debit {:optional true} [:maybe [:int {:min 1}]]]
+   [:credit {:optional true} [:maybe [:int {:min 1}]]]])
+
+(def audit-response-spec
+  [:vector audit-response-item-spec])
+
 ;; Error response
 (def error-response-spec
   [:map {:closed true}
@@ -57,6 +68,14 @@
   {:account-number (:account-number account)
    :name (:name account)
    :balance (:balance account)})
+
+(defn account-event->response
+  "Converts an account event from the persistence layer to HTTP response format."
+  [event]
+  (cond-> {:sequence (:sequence event)
+           :description (:description event)}
+    (:debit event) (assoc :debit (:debit event))
+    (:credit event) (assoc :credit (:credit event))))
 
 ;; Validation functions
 (defn valid-create-account-request? [request]
@@ -79,6 +98,9 @@
 
 (defn valid-withdraw-response? [response]
   (m/validate withdraw-response-spec response))
+
+(defn valid-audit-response? [response]
+  (m/validate audit-response-spec response))
 
 (defn valid-error-response? [response]
   (m/validate error-response-spec response))

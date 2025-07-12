@@ -90,7 +90,21 @@
                               :description "Account not found"}
                          500 {:body api/error-response-spec
                               :description "Internal server error"}}
-              :handler (:withdraw handlers)}}]]]])
+              :handler (:withdraw handlers)}}]
+     
+     ["/:id/audit"
+      {:get {:summary "Retrieve account audit log"
+             :description "Retrieves the audit log of an account. The audit log consists of records describing the events on the account in reverse chronological order."
+             :parameters {:path [:map [:id :int]]}
+             :responses {200 {:body api/audit-response-spec
+                             :description "Audit log retrieved successfully"}
+                        400 {:body api/error-response-spec
+                             :description "Invalid request"}
+                        404 {:body api/error-response-spec
+                             :description "Account not found"}
+                        500 {:body api/error-response-spec
+                             :description "Internal server error"}}
+             :handler (:audit handlers)}}]]]])
 
 (defn create-router
   "Creates a Reitit router with the given handlers."

@@ -120,3 +120,27 @@
           (spy-assert/called-n-times? jdbc/transact 2)
           (spy-assert/called-n-times? sql/update! 2)
           (spy-assert/called-n-times? jdbc/execute-one! 2))))))
+
+(deftest find-account-events-test
+  (testing "find-account-events calls next.jdbc functions correctly and returns valid account events"
+    (with-redefs [sql/query (spy/spy (fn [_ sql-and-params _]
+                                       (when (= (second sql-and-params) 1)
+                                         [{:sequence 2 :description "withdraw" :debit 50 :credit nil}
+                                          {:sequence 1 :description "deposit" :debit nil :credit 100}])))]
+      (let [repo (repo/->JdbcAccountRepository "mock-datasource")
+            events (repo/find-account-events repo 1)]
+        (is (= 2 (count events)))
+        (is (= 2 (:sequence (first events))))
+        (is (= "withdraw" (:description (first events))))
+        (is (= 50 (:debit (first events))))
+        (is (= 1 (:sequence (second events))))
+        (is (= "deposit" (:description (second events))))
+        (is (= 100 (:credit (second events))))
+        (spy-assert/called-once? sql/query)))
+    
+    (testing "returns empty list for account with no events"
+      (with-redefs [sql/query (spy/spy (fn [_ _ _] []))]
+        (let [repo (repo/->JdbcAccountRepository "mock-datasource")
+              events (repo/find-account-events repo 1)]
+          (is (= [] events))
+          (spy-assert/called-once? sql/query))))))

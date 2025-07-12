@@ -9,7 +9,8 @@
   (create-account [this name])
   (retrieve-account [this account-number])
   (deposit-to-account [this account-number amount])
-  (withdraw-from-account [this account-number amount]))
+  (withdraw-from-account [this account-number amount])
+  (retrieve-account-audit [this account-number]))
 
 (defrecord SyncAccountService [repository]
   AccountService
@@ -35,7 +36,14 @@
     (let [account (repo/find-account repository account-number)
           {updated-account :account withdraw-event :event} (domain/withdraw account amount)]
       (repo/save-account-event repository updated-account withdraw-event)
-      updated-account)))
+      updated-account))
+
+  (retrieve-account-audit [_ account-number]
+    (log/info "Retrieving audit log for account" account-number)
+    ;; First check if account exists by trying to retrieve it
+    (repo/find-account repository account-number)
+    ;; If no exception thrown, retrieve the events
+    (repo/find-account-events repository account-number)))
 
 ;; Integrant methods
 (defmethod ig/init-key ::service [_ {:keys [repository]}]

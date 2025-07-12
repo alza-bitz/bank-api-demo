@@ -10,7 +10,8 @@
   "Repository interface for account operations."
   (save-account [this account])
   (find-account [this account-number])
-  (save-account-event [this account event]))
+  (save-account-event [this account event])
+  (find-account-events [this account-number]))
 
 (def rs->account rs/as-unqualified-kebab-maps)
 
@@ -74,13 +75,19 @@
                              (throw e)))))]
           (if (= result ::retry)
             (recur (inc attempt))
-            result))))))
+            result)))))
+
+  (find-account-events [_ account-number]
+    (sql/query datasource
+               ["SELECT id, event_sequence, account_number, description, timestamp, debit, credit FROM account_event WHERE account_number = ? ORDER BY event_sequence DESC"
+                account-number]
+               {:builder-fn rs->account-event})))
 
 ;; Database schema functions
 (defn create-tables!
   "Creates the account and account_event tables."
   [datasource]
-  (let [logging-datasource (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))] 
+  (let [logging-datasource (jdbc/with-logging datasource #(log/debug {:op %1 :sql %2}))] 
     (jdbc/execute! logging-datasource
                    ["CREATE TABLE IF NOT EXISTS account (
         id UUID PRIMARY KEY,
@@ -103,7 +110,7 @@
 (defn drop-tables!
   "Drops the account and account_event tables."
   [datasource]
-  (let [logging-datasource (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))] 
+  (let [logging-datasource (jdbc/with-logging datasource #(log/debug {:op %1 :sql %2}))] 
     (jdbc/execute! logging-datasource ["DROP TABLE IF EXISTS account_event"])
     (jdbc/execute! logging-datasource ["DROP TABLE IF EXISTS account"])))
 
@@ -111,7 +118,7 @@
   "Creates a JdbcAccountRepository with logging wrapped datasource."
   [datasource]
   (->JdbcAccountRepository
-   (jdbc/with-logging datasource #(log/info {:op %1 :sql %2}))))
+   (jdbc/with-logging datasource #(log/debug {:op %1 :sql %2}))))
 
 ;; Integrant methods
 (defmethod ig/init-key ::repository [_ {:keys [datasource]}]

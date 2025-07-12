@@ -160,6 +160,44 @@
          :body {:error "internal-server-error"
                 :message "Failed to withdraw from account"}}))))
 
+(defn audit-handler
+  "HTTP handler for retrieving account audit logs."
+  [service]
+  (fn [request]
+    (try
+      (let [account-number (-> request :path-params :id Integer/parseInt)]
+        (log/info "HTTP: Retrieving audit log for account" account-number)
+        (let [events (service/retrieve-account-audit service account-number)
+              response (mapv api/account-event->response events)]
+          {:status 200
+           :body response}))
+      (catch NumberFormatException e
+        (log/warn e "HTTP: Invalid account number format")
+        {:status 400
+         :body {:error "bad-request"
+                :message "Invalid account number format"}})
+      (catch clojure.lang.ExceptionInfo e
+        (let [error-data (ex-data e)
+              error-key (:error error-data)]
+          (case error-key
+            :account-not-found
+            (do
+              (log/warn "HTTP: Account not found" (:account-number error-data))
+              {:status 404
+               :body {:error "account-not-found"
+                      :message "Account not found"}})
+            ;; default case
+            (do
+              (log/error e "HTTP: Error retrieving audit log")
+              {:status 500
+               :body {:error "internal-server-error"
+                      :message "Failed to retrieve audit log"}}))))
+      (catch Exception e
+        (log/error e "HTTP: Error retrieving audit log")
+        {:status 500
+         :body {:error "internal-server-error"
+                :message "Failed to retrieve audit log"}}))))
+
 (defrecord HttpHandlers [service]
   Object
   (toString [_] "HttpHandlers"))
@@ -170,7 +208,8 @@
   {:create-account (create-account-handler service)
    :view-account (view-account-handler service)
    :deposit (deposit-handler service)
-   :withdraw (withdraw-handler service)})
+   :withdraw (withdraw-handler service)
+   :audit (audit-handler service)})
 
 ;; Integrant methods
 (defmethod ig/init-key ::handlers [_ {:keys [service]}]
