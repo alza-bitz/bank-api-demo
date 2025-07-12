@@ -3,6 +3,7 @@ applyTo: '**'
 ---
 
 # Persistence layer
+- Create a JdbcAccountRepository record implementing the AccountRepository protocol.
 - The repository will be updating or inserting on account and account_event tables.
 - The repository will use the next.jdbc library for all database operations.
 - The local identity for account events can be implemented using the following sql statement: `insert into account_event (event_sequence, account_number) select coalesce(max(event_sequence), 0) + 1, ? from account_event where account_number = ?`

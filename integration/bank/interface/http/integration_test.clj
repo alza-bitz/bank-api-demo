@@ -111,7 +111,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "not-found" (get body "error")))
+        (is (= "account-not-found" (get body "error")))
         (is (= "Account not found" (get body "message")))))))
 
 (deftest invalid-deposit-integration-test
@@ -184,7 +184,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "not-found" (get body "error")))
+        (is (= "account-not-found" (get body "error")))
         (is (= "Account not found" (get body "message")))))))
 
 (deftest invalid-withdraw-integration-test

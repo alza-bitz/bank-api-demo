@@ -74,10 +74,14 @@
         (is (account/valid-saved-account? found-account))
         (is (= saved-account found-account)))))
 
-  (testing "find non-existent account returns nil"
-    (let [repository (repo/logging-jdbc-account-repository *datasource*)
-          account (repo/find-account repository 999999)]
-      (is (nil? account)))))
+  (testing "find non-existent account throws ExceptionInfo"
+    (let [repository (repo/logging-jdbc-account-repository *datasource*)]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Account not found"
+                           (repo/find-account repository 999999)))
+      (is (= :account-not-found 
+             (-> (try (repo/find-account repository 999999)
+                      (catch clojure.lang.ExceptionInfo e (ex-data e)))
+                 :error))))))
 
 (deftest jdbc-repository-property-based-test
   (testing "created accounts are always valid on save"

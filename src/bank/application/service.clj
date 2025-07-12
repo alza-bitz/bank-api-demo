@@ -21,26 +21,21 @@
 
   (retrieve-account [_ account-number]
     (log/info "Retrieving account" account-number)
-    (or (repo/find-account repository account-number)
-        (throw (ex-info "Account not found" {:account-number account-number}))))
+    (repo/find-account repository account-number))
 
   (deposit-to-account [_ account-number amount]
     (log/info "Depositing" amount "to account" account-number)
-    (if-let [account (repo/find-account repository account-number)]
-      (let [{updated-account :account  deposit-event :event} (domain/deposit account amount)]
-        (repo/save-account-event repository updated-account deposit-event)
-        updated-account)
-      (throw (ex-info "Account not found" {:account-number account-number}))))
+    (let [account (repo/find-account repository account-number)
+          {updated-account :account  deposit-event :event} (domain/deposit account amount)]
+      (repo/save-account-event repository updated-account deposit-event)
+      updated-account))
 
   (withdraw-from-account [_ account-number amount]
     (log/info "Withdrawing" amount "from account" account-number)
-    (if-let [account (repo/find-account repository account-number)]
-      (if (>= (:balance account) amount)
-        (let [{updated-account :account withdraw-event :event} (domain/withdraw account amount)]
-          (repo/save-account-event repository updated-account withdraw-event)
-          updated-account)
-        (throw (ex-info "Insufficient funds" {:account-number account-number :balance (:balance account) :amount amount})))
-      (throw (ex-info "Account not found" {:account-number account-number})))))
+    (let [account (repo/find-account repository account-number)
+          {updated-account :account withdraw-event :event} (domain/withdraw account amount)]
+      (repo/save-account-event repository updated-account withdraw-event)
+      updated-account)))
 
 ;; Integrant methods
 (defmethod ig/init-key ::service [_ {:keys [repository]}]

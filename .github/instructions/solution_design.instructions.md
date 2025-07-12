@@ -19,18 +19,25 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - Account events are produced by the following actions: deposit, withdraw, transfer to, transfer from.
 - Account creation and account view do not produce account events.
 - Use the domain events pattern to provide a function for each account action that takes an account plus other relevant args and returns a corresponding account event.
+- These account action functions must throw an ExceptionInfo on any domain error with an :error key representing the domain error as a keyword.
 - Use Malli to define specs for accounts, account actions and account events.
 
+## Domain errors
+- Withdraw money error keys: :insufficient-funds
+
 # Persistence layer
-- Use the DDD repository pattern.
+- Use the DDD repository pattern to create an AccountRepository protocol.
 - The repository will have a function for saving accounts that takes an account and returns a saved account.
-- The repository will have a function for finding an account by account number that returns the account or nil if not found.
+- The repository will have a function for finding an account by account number that returns the account or throws an ExceptionInfo with :error key :account-not-found
 - The repository will have a function for saving an account event that takes an account and the event and returns the saved account event.
 
 # Application layer
-- Application layer will initially be implemented using a synchronous API.
-- For account create or account view, just call the persistence layer repository.
-- For account actions, use the domain layer to create the account event and then call the persistence layer repository, passing account and event.
+- The Application layer will initially be implemented using a synchronous API.
+- Use the DDD application service pattern to create an AccountService protocol.
+- Create a SyncAccountService record implementing the AccountService protocol.
+- For account create, use the domain layer to create the account and then call the persistence layer repository.
+- For account view, just call the persistence layer repository.
+- For account actions, use the domain layer to create the account event and then call the persistence layer repository, passing the account and event.
 - 
 - Unit tests will mock the persistence layer functions.
 
@@ -38,6 +45,7 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - The HTTP API contract should match the endpoints in [problem_statement_and_requirements.instructions.md](problem_statement_and_requirements.instructions.md)
 - Use the Metosin libraries i.e. Reitit, Malli, Muuntaja, Jsonista for the web stack.
 - Use Malli to define specs for the HTTP API endpoint requests and responses.
+- The interface layer should catch any ExceptionInfo thrown by the other layers, extract the :error key, choose the HTTP response status code based on the value and include the :error in the reponse body.
 - Expose the HTTP API contract and endpoints using OpenAPI 3.x
 - 
 - Unit tests will mock the application layer functions.

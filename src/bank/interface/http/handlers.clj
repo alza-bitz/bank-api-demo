@@ -43,17 +43,21 @@
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
       (catch clojure.lang.ExceptionInfo e
-        (if (= "Account not found" (.getMessage e))
-          (do
-            (log/warn "HTTP: Account not found" (:account-number (ex-data e)))
-            {:status 404
-             :body {:error "not-found"
-                    :message "Account not found"}})
-          (do
-            (log/error e "HTTP: Error viewing account")
-            {:status 500
-             :body {:error "internal-server-error"
-                    :message "Failed to retrieve account"}})))
+        (let [error-data (ex-data e)
+              error-key (:error error-data)]
+          (case error-key
+            :account-not-found
+            (do
+              (log/warn "HTTP: Account not found" (:account-number error-data))
+              {:status 404
+               :body {:error "account-not-found"
+                      :message "Account not found"}})
+            ;; default case
+            (do
+              (log/error e "HTTP: Error viewing account")
+              {:status 500
+               :body {:error "internal-server-error"
+                      :message "Failed to retrieve account"}}))))
       (catch Exception e
         (log/error e "HTTP: Error viewing account")
         {:status 500
@@ -83,17 +87,21 @@
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
       (catch clojure.lang.ExceptionInfo e
-        (if (= "Account not found" (.getMessage e))
-          (do
-            (log/warn "HTTP: Account not found" (:account-number (ex-data e)))
-            {:status 404
-             :body {:error "not-found"
-                    :message "Account not found"}})
-          (do
-            (log/error e "HTTP: Error depositing to account")
-            {:status 500
-             :body {:error "internal-server-error"
-                    :message "Failed to deposit to account"}})))
+        (let [error-data (ex-data e)
+              error-key (:error error-data)]
+          (case error-key
+            :account-not-found
+            (do
+              (log/warn "HTTP: Account not found" (:account-number error-data))
+              {:status 404
+               :body {:error "account-not-found"
+                      :message "Account not found"}})
+            ;; default case
+            (do
+              (log/error e "HTTP: Error depositing to account")
+              {:status 500
+               :body {:error "internal-server-error"
+                      :message "Failed to deposit to account"}}))))
       (catch Exception e
         (log/error e "HTTP: Error depositing to account")
         {:status 500
@@ -123,27 +131,29 @@
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
       (catch clojure.lang.ExceptionInfo e
-        (cond
-          (= "Account not found" (.getMessage e))
-          (do
-            (log/warn "HTTP: Account not found" (:account-number (ex-data e)))
-            {:status 404
-             :body {:error "not-found"
-                    :message "Account not found"}})
-          
-          (= "Insufficient funds" (.getMessage e))
-          (do
-            (log/warn "HTTP: Insufficient funds for withdrawal" (ex-data e))
-            {:status 400
-             :body {:error "insufficient-funds"
-                    :message "Insufficient funds for withdrawal"}})
-          
-          :else
-          (do
-            (log/error e "HTTP: Error withdrawing from account")
-            {:status 500
-             :body {:error "internal-server-error"
-                    :message "Failed to withdraw from account"}})))
+        (let [error-data (ex-data e)
+              error-key (:error error-data)]
+          (case error-key
+            :account-not-found
+            (do
+              (log/warn "HTTP: Account not found" (:account-number error-data))
+              {:status 404
+               :body {:error "account-not-found"
+                      :message "Account not found"}})
+            
+            :insufficient-funds
+            (do
+              (log/warn "HTTP: Insufficient funds for withdrawal" error-data)
+              {:status 400
+               :body {:error "insufficient-funds"
+                      :message "Insufficient funds for withdrawal"}})
+            
+            ;; default case
+            (do
+              (log/error e "HTTP: Error withdrawing from account")
+              {:status 500
+               :body {:error "internal-server-error"
+                      :message "Failed to withdraw from account"}}))))
       (catch Exception e
         (log/error e "HTTP: Error withdrawing from account")
         {:status 500

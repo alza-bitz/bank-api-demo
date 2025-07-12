@@ -32,7 +32,9 @@
                                         :builder-fn rs->account})))
 
   (find-account [_ account-number]
-    (sql/get-by-id datasource :account account-number :account_number {:builder-fn rs->account}))
+    (or (sql/get-by-id datasource :account account-number :account_number {:builder-fn rs->account})
+        (throw (ex-info "Account not found" {:error :account-not-found 
+                                             :account-number account-number}))))
 
   (save-account-event [_ account event]
     (let [max-attempts 3

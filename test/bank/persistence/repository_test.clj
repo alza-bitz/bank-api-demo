@@ -39,9 +39,13 @@
         (is (= 100 (:balance account)))
         (spy-assert/called-once? sql/get-by-id))
       
-      (let [repo (repo/->JdbcAccountRepository "mock-datasource")
-            account (repo/find-account repo 999)]
-        (is (nil? account)))))
+      (let [repo (repo/->JdbcAccountRepository "mock-datasource")]
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Account not found"
+                             (repo/find-account repo 999)))
+        (is (= :account-not-found 
+               (-> (try (repo/find-account repo 999)
+                        (catch clojure.lang.ExceptionInfo e (ex-data e)))
+                   :error))))))
   
   (testing "save-account-event calls next.jdbc functions correctly and returns a valid account event"
     (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]

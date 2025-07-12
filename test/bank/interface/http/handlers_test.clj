@@ -17,21 +17,21 @@
          :account-number 123
          :name "Test User"
          :balance 100}
-        (throw (ex-info "Account not found" {:account-number account-number}))))
+        (throw (ex-info "Account not found" {:error :account-not-found :account-number account-number}))))
     (deposit-to-account [_ account-number amount]
       (if (= account-number 123)
         {:id (random-uuid)
          :account-number 123
          :name "Test User"
          :balance (+ 100 amount)}
-        (throw (ex-info "Account not found" {:account-number account-number}))))
+        (throw (ex-info "Account not found" {:error :account-not-found :account-number account-number}))))
     (withdraw-from-account [_ account-number amount]
       (cond
         (not= account-number 123)
-        (throw (ex-info "Account not found" {:account-number account-number}))
+        (throw (ex-info "Account not found" {:error :account-not-found :account-number account-number}))
         
         (> amount 100)
-        (throw (ex-info "Insufficient funds" {:account-number account-number :balance 100 :amount amount}))
+        (throw (ex-info "Insufficient funds" {:error :insufficient-funds :account-number account-number :balance 100 :amount amount}))
         
         :else
         {:id (random-uuid)
@@ -94,7 +94,7 @@
           request {:path-params {:id "999"}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "not-found" (get-in response [:body :error])))
+      (is (= "account-not-found" (get-in response [:body :error])))
       (is (= "Account not found" (get-in response [:body :message])))))
 
   (testing "service exception handling"
@@ -146,7 +146,7 @@
                   :body-params {:amount 50}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "not-found" (get-in response [:body :error])))
+      (is (= "account-not-found" (get-in response [:body :error])))
       (is (= "Account not found" (get-in response [:body :message])))))
 
   (testing "service exception handling"
@@ -208,7 +208,7 @@
                    :body-params {:amount 50}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "not-found" (get-in response [:body :error])))
+      (is (= "account-not-found" (get-in response [:body :error])))
       (is (= "Account not found" (get-in response [:body :message])))))
 
   (testing "service exception handling"

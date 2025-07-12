@@ -124,8 +124,12 @@
 
   (testing "withdraw validates sufficient balance"
     (let [account (assoc (account/create-account "Test User") :balance 50)]
-      (is (thrown? AssertionError
-                   (account/withdraw account 100)))))
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Insufficient funds"
+                           (account/withdraw account 100)))
+      (is (= :insufficient-funds 
+             (-> (try (account/withdraw account 100)
+                      (catch clojure.lang.ExceptionInfo e (ex-data e)))
+                 :error)))))
 
   (testing "withdraw can reduce balance to zero"
     (let [account (assoc (account/create-account "Zero Balance User") :balance 75)

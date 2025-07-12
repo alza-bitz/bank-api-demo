@@ -94,8 +94,11 @@
    Amount must be positive and resulting balance must not be negative."
   [account amount]
   {:pre [(m/validate account-spec account)
-         (pos? amount)
-         (>= (:balance account) amount)]}
+         (pos? amount)]}
+  (when (< (:balance account) amount)
+    (throw (ex-info "Insufficient funds" {:error :insufficient-funds 
+                                          :balance (:balance account) 
+                                          :amount amount})))
   (let [updated-account (update account :balance - amount)
         withdraw-event (create-account-event "withdraw" {:debit amount})]
     {:account updated-account
