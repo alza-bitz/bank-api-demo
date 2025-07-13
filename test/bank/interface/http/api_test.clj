@@ -1,7 +1,9 @@
 (ns bank.interface.http.api-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [malli.generator :as mg]
-            [bank.interface.http.api :as api]))
+  (:require
+   [bank.interface.http.api :as api]
+   [clojure.test :refer [deftest is testing]]
+   [malli.generator :as mg]
+   [bank.domain.account :as account]))
 
 (deftest api-specs-test
   (testing "create-account-request-spec validation"
@@ -40,16 +42,21 @@
     (is (false? (api/valid-error-response? {:message "Account not found"})))))
 
 (deftest account-conversion-test
-  (testing "account->response conversion"
-    (let [saved-account {:id (random-uuid)
-                        :account-number 123
-                        :name "Jane Smith"
-                        :balance 250}
-          response (api/account->response saved-account)]
-      (is (= {:account-number 123 :name "Jane Smith" :balance 250} response))
-      (is (true? (api/valid-create-account-response? response)))
-      (is (true? (api/valid-view-account-response? response)))
-      (is (true? (api/valid-deposit-response? response))))))
+  (testing "generated saved accounts always convert to valid responses"
+    (doseq [_ (range 10)]
+      (let [saved-account (mg/generate account/saved-account-spec)
+            response (api/account->response saved-account)]
+        (is (= response (select-keys saved-account (keys response))))
+        (is (true? (api/valid-create-account-response? response)))
+        (is (true? (api/valid-view-account-response? response)))
+        (is (true? (api/valid-deposit-response? response))))))
+  (testing "generated saved account events always convert to valid responses"
+    (let [saved-account-events (mg/generate [:vector {:gen/max 3} account/saved-account-event-spec])
+          response (mapv api/account-event->response saved-account-events)]
+      (is (true? (api/valid-audit-response? response)))
+      (is (every? (fn [[saved-event response-item]]
+                    (= response-item (select-keys saved-event (keys response-item))))
+                  (map vector saved-account-events response))))))
 
 (deftest generative-specs-test
   (testing "API specs can generate valid data"
@@ -59,7 +66,7 @@
           deposit-req (mg/generate api/deposit-request-spec)
           deposit-resp (mg/generate api/deposit-response-spec)
           error-resp (mg/generate api/error-response-spec)]
-      
+
       (is (true? (api/valid-create-account-request? create-req)))
       (is (true? (api/valid-create-account-response? create-resp)))
       (is (true? (api/valid-view-account-response? view-resp)))

@@ -13,9 +13,14 @@
   (save-account-event [this account event])
   (find-account-events [this account-number]))
 
-(def rs->account rs/as-unqualified-kebab-maps)
+(def account-builder rs/as-unqualified-kebab-maps)
 
-(defn rs->account-event 
+(defn prune-nil-keys 
+  "Remove keys with nil values from a map"
+  [m]
+  (into {} (filter (fn [[_k v]] (some? v)) m)))
+
+(defn account-event-builder 
   "Transform result set for account events, converting event_sequence to sequence"
   [result-set options]
   (let [label-fn (fn [label]
@@ -30,58 +35,61 @@
   (save-account [_ account]
     (jdbc/with-transaction [tx datasource]
       (sql/insert! tx :account account {:return-keys true
-                                        :builder-fn rs->account})))
+                                        :builder-fn account-builder})))
 
   (find-account [_ account-number]
-    (or (sql/get-by-id datasource :account account-number :account_number {:builder-fn rs->account})
+    (or (sql/get-by-id datasource :account account-number :account_number {:builder-fn account-builder})
         (throw (ex-info "Account not found" {:error :account-not-found 
                                              :account-number account-number}))))
 
-  (save-account-event [_ account event]
-    (let [max-attempts 3
-          retry-delay-range 50]
-      (loop [attempt 1]
-        (let [result (try
-                       (when (> attempt 1)
-                         (log/infof "Retrying transaction, attempt %d" attempt))
-                       (jdbc/with-transaction [tx datasource]
-                         ;; First update the account
-                         (sql/update! tx :account
-                                      (select-keys account [:balance])
-                                      {:account_number (:account-number account)})
-                         ;; Then insert the event using per-account sequence number
-                         (jdbc/execute-one! tx
-                                            ["INSERT INTO account_event (id, event_sequence, account_number, description, timestamp, debit, credit) 
-                                              VALUES (?, (SELECT COALESCE(MAX(event_sequence), 0) + 1 FROM account_event WHERE account_number = ?), ?, ?, ?, ?, ?)"
-                                             (:id event)
-                                             (:account-number account)
-                                             (:account-number account)
-                                             (:description event)
-                                             (java.sql.Timestamp/from (:timestamp event))
-                                             (:debit (:action event))
-                                             (:credit (:action event))]
-                                            {:return-keys true
-                                             :builder-fn rs->account-event}))
-                       (catch org.postgresql.util.PSQLException e
-                         (log/warnf "Failed to commit transaction on attempt %d: %s" attempt (.getMessage e))
-                         (if (and (< attempt max-attempts)
-                                  (= (.getState org.postgresql.util.PSQLState/UNIQUE_VIOLATION) 
-                                     (.getSQLState e)))
-                           (do
-                             (Thread/sleep (rand-int retry-delay-range))
-                             ::retry)
-                           (do
-                             (log/errorf "Failed to commit transaction after maximum %d attempts, rethrowing: %s" attempt (.getMessage e))
-                             (throw e)))))]
-          (if (= result ::retry)
-            (recur (inc attempt))
-            result)))))
+  (save-account-event
+   [_ account event]
+   (let [max-attempts 3
+         retry-delay-range 50]
+     (loop [attempt 1]
+       (let [result (try
+                      (when (> attempt 1)
+                        (log/infof "Retrying transaction, attempt %d" attempt))
+                      (jdbc/with-transaction [tx datasource]
+                        ;; First update the account
+                        (sql/update! tx :account
+                                     (select-keys account [:balance])
+                                     {:account_number (:account-number account)})
+                        ;; Then insert the event using per-account sequence number
+                        (-> (jdbc/execute-one! tx
+                                               ["INSERT INTO account_event (id, event_sequence, account_number, description, timestamp, debit, credit) 
+                                                    VALUES (?, (SELECT COALESCE(MAX(event_sequence), 0) + 1 FROM account_event WHERE account_number = ?), ?, ?, ?, ?, ?)"
+                                                (:id event)
+                                                (:account-number account)
+                                                (:account-number account)
+                                                (:description event)
+                                                (java.sql.Timestamp/from (:timestamp event))
+                                                (:debit (:action event))
+                                                (:credit (:action event))]
+                                               {:return-keys true
+                                                :builder-fn account-event-builder})
+                            prune-nil-keys))
+                      (catch org.postgresql.util.PSQLException e
+                        (log/warnf "Failed to commit transaction on attempt %d: %s" attempt (.getMessage e))
+                        (if (and (< attempt max-attempts)
+                                 (= (.getState org.postgresql.util.PSQLState/UNIQUE_VIOLATION)
+                                    (.getSQLState e)))
+                          (do
+                            (Thread/sleep (rand-int retry-delay-range))
+                            ::retry)
+                          (do
+                            (log/errorf "Failed to commit transaction after maximum %d attempts, rethrowing: %s" attempt (.getMessage e))
+                            (throw e)))))]
+         (if (= result ::retry)
+           (recur (inc attempt))
+           result)))))
 
   (find-account-events [_ account-number]
-    (sql/query datasource
-               ["SELECT id, event_sequence, account_number, description, timestamp, debit, credit FROM account_event WHERE account_number = ? ORDER BY event_sequence DESC"
-                account-number]
-               {:builder-fn rs->account-event})))
+                       (->> (sql/query datasource
+                                       ["SELECT id, event_sequence, account_number, description, timestamp, debit, credit FROM account_event WHERE account_number = ? ORDER BY event_sequence DESC"
+                                        account-number]
+                                       {:builder-fn account-event-builder})
+                            (mapv prune-nil-keys))))
 
 ;; Database schema functions
 (defn create-tables!

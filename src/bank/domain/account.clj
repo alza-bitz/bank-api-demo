@@ -45,14 +45,21 @@
    [:action event-action-spec]])
 
 (def saved-account-event-spec
-  [:map
-   [:id [:uuid]]
-   [:description event-description-spec]
-   [:timestamp inst?]
-   [:sequence event-sequence-spec]
-   [:account-number account-number-spec]
-   [:credit {:optional true} [:maybe [:int {:min 1}]]]
-   [:debit {:optional true} [:maybe [:int {:min 1}]]]])
+  [:and
+   [:map
+    [:id [:uuid]]
+    [:description event-description-spec]
+    [:timestamp inst?]
+    [:sequence event-sequence-spec]
+    [:account-number account-number-spec]
+    [:credit {:optional true} [:int {:min 1}]]
+    [:debit {:optional true} [:int {:min 1}]]]
+   ;; Ensure exactly one of credit or debit is present
+   [:fn (fn [event]
+          (let [has-credit (contains? event :credit)
+                has-debit (contains? event :debit)]
+            (and (or has-credit has-debit)
+                 (not (and has-credit has-debit)))))]])
 
 ;; Domain functions
 (defn create-account

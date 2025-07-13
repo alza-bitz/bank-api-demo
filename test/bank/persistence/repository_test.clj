@@ -125,10 +125,11 @@
   (testing "find-account-events calls next.jdbc functions correctly and returns valid account events"
     (with-redefs [sql/query (spy/spy (fn [_ sql-and-params _]
                                        (when (= (second sql-and-params) 1)
-                                         [{:sequence 2 :description "withdraw" :debit 50 :credit nil}
-                                          {:sequence 1 :description "deposit" :debit nil :credit 100}])))]
+                                         [{:id (random-uuid) :sequence 2 :account-number 1 :description "withdraw" :timestamp (java.time.Instant/now) :debit 50}
+                                          {:id (random-uuid) :sequence 1 :account-number 1 :description "deposit" :timestamp (java.time.Instant/now) :credit 100}])))]
       (let [repo (repo/->JdbcAccountRepository "mock-datasource")
             events (repo/find-account-events repo 1)]
+        (is (every? account/valid-saved-account-event? events))
         (is (= 2 (count events)))
         (is (= 2 (:sequence (first events))))
         (is (= "withdraw" (:description (first events))))
