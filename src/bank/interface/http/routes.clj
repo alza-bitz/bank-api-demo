@@ -92,6 +92,21 @@
                               :description "Internal server error"}}
               :handler (:withdraw handlers)}}]
      
+     ["/:id/send"
+      {:post {:summary "Transfer money to another account"
+              :description "Transfers money from one existing account to another existing account. You cannot transfer money from an account to itself. The resulting balance of the sending account must not fall below zero."
+              :parameters {:path [:map [:id :int]]
+                          :body api/transfer-request-spec}
+              :responses {200 {:body api/transfer-response-spec
+                              :description "Transfer completed successfully"}
+                         400 {:body api/error-response-spec
+                              :description "Invalid request, insufficient funds, or same account transfer"}
+                         404 {:body api/error-response-spec
+                              :description "Account not found"}
+                         500 {:body api/error-response-spec
+                              :description "Internal server error"}}
+              :handler (:transfer handlers)}}]
+     
      ["/:id/audit"
       {:get {:summary "Retrieve account audit log"
              :description "Retrieves the audit log of an account. The audit log consists of records describing the events on the account in reverse chronological order."

@@ -145,3 +145,30 @@
               events (repo/find-account-events repo 1)]
           (is (= [] events))
           (spy-assert/called-once? sql/query))))))
+
+(deftest save-account-events-test
+  (testing "save-account-events calls next.jdbc functions correctly for multiple accounts"
+    (with-redefs [jdbc/transact (spy/spy (fn [ds tx-fn _]
+                                          (tx-fn ds)))
+                  sql/update! (spy/spy (fn [_ _ _ _] 1))
+                  jdbc/execute-one! (spy/spy (fn [_ _ _]
+                                              {:id (random-uuid)
+                                               :sequence 1
+                                               :account-number 1
+                                               :description "test"
+                                               :timestamp (java.time.Instant/now)
+                                               :debit 50}))]
+      (let [repo (repo/->JdbcAccountRepository "mock-datasource")
+            sender-account {:id (random-uuid) :account-number 1 :name "Sender" :balance 50}
+            receiver-account {:id (random-uuid) :account-number 2 :name "Receiver" :balance 150}
+            sender-event (account/create-account-event "send to #2" {:debit 50})
+            receiver-event (account/create-account-event "receive from #1" {:credit 50})
+            account-event-pairs [{:account sender-account :event sender-event}
+                                 {:account receiver-account :event receiver-event}]]
+        (repo/save-account-events repo account-event-pairs)
+        ;; Should call transact once (all in same transaction)
+        (spy-assert/called-once? jdbc/transact)
+        ;; Should call update! twice (once for each account)
+        (spy-assert/called-n-times? sql/update! 2)
+        ;; Should call execute-one! twice (once for each event)
+        (spy-assert/called-n-times? jdbc/execute-one! 2)))))

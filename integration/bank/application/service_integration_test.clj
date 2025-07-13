@@ -141,3 +141,88 @@
            clojure.lang.ExceptionInfo 
            #"Account not found"
            (service/retrieve-account-audit service 999999))))))
+
+(deftest transfer-between-accounts-service-integration-test
+  (testing "transfer money between accounts end-to-end"
+    (let [service (service/->SyncAccountService *repository*)
+          sender-account (service/create-account service "Sender")
+          receiver-account (service/create-account service "Receiver")
+          sender-number (:account-number sender-account)
+          receiver-number (:account-number receiver-account)]
+
+      ;; Initial setup - deposit to sender
+      (service/deposit-to-account service sender-number 100)
+
+      ;; Transfer money
+      (let [result (service/transfer-between-accounts service sender-number receiver-number 30)
+            updated-sender (:sender result)
+            updated-receiver (:receiver result)]
+        (is (= 70 (:balance updated-sender)))
+        (is (= sender-number (:account-number updated-sender)))
+        (is (= 30 (:balance updated-receiver)))
+        (is (= receiver-number (:account-number updated-receiver)))
+
+        ;; Check audit logs
+        (let [sender-events (service/retrieve-account-audit service sender-number)
+              receiver-events (service/retrieve-account-audit service receiver-number)]
+          
+          ;; Sender should have deposit and send events
+          (is (= 2 (count sender-events)))
+          (is (= "send to #2" (:description (first sender-events))))
+          (is (= 30 (:debit (first sender-events))))
+          (is (= "deposit" (:description (second sender-events))))
+          
+          ;; Receiver should have receive event
+          (is (= 1 (count receiver-events)))
+          (is (= "receive from #1" (:description (first receiver-events))))
+          (is (= 30 (:credit (first receiver-events))))))))
+
+  (testing "transfer with insufficient funds fails"
+    (let [service (service/->SyncAccountService *repository*)
+          sender-account (service/create-account service "Poor Sender")
+          receiver-account (service/create-account service "Receiver")
+          sender-number (:account-number sender-account)
+          receiver-number (:account-number receiver-account)]
+
+      ;; Only deposit 50
+      (service/deposit-to-account service sender-number 50)
+
+      ;; Try to transfer 100 - should fail
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Insufficient funds"
+           (service/transfer-between-accounts service sender-number receiver-number 100)))))
+
+  (testing "transfer to same account fails"
+    (let [service (service/->SyncAccountService *repository*)
+          account (service/create-account service "Self Transfer")
+          account-number (:account-number account)]
+
+      (service/deposit-to-account service account-number 100)
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Cannot transfer to same account"
+           (service/transfer-between-accounts service account-number account-number 50)))))
+
+  (testing "transfer to non-existent account fails"
+    (let [service (service/->SyncAccountService *repository*)
+          sender-account (service/create-account service "Sender")
+          sender-number (:account-number sender-account)]
+
+      (service/deposit-to-account service sender-number 100)
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/transfer-between-accounts service sender-number 999999 50)))))
+
+  (testing "transfer from non-existent account fails"
+    (let [service (service/->SyncAccountService *repository*)
+          receiver-account (service/create-account service "Receiver")
+          receiver-number (:account-number receiver-account)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/transfer-between-accounts service 999999 receiver-number 50))))))

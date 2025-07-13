@@ -160,6 +160,67 @@
          :body {:error "internal-server-error"
                 :message "Failed to withdraw from account"}}))))
 
+(defn transfer-handler
+  "HTTP handler for transferring money between accounts."
+  [service]
+  (fn [request]
+    (try
+      (let [sender-account-number (-> request :path-params :id Integer/parseInt)
+            body (:body-params request)
+            amount (:amount body)
+            receiver-account-number (:account-number body)]
+        (log/info "HTTP: Transferring" amount "from account" sender-account-number "to account" receiver-account-number)
+        (if (api/valid-transfer-request? body)
+          (let [result (service/transfer-between-accounts service sender-account-number receiver-account-number amount)
+                sender-account (:sender result)
+                response (api/account->response sender-account)]
+            {:status 200
+             :body response})
+          {:status 400
+           :body {:error "bad-request"
+                  :message "Invalid request body"}}))
+      (catch NumberFormatException e
+        (log/warn e "HTTP: Invalid account number format")
+        {:status 400
+         :body {:error "bad-request"
+                :message "Invalid account number format"}})
+      (catch clojure.lang.ExceptionInfo e
+        (let [error-data (ex-data e)
+              error-key (:error error-data)]
+          (case error-key
+            :account-not-found
+            (do
+              (log/warn "HTTP: Account not found" (:account-number error-data))
+              {:status 404
+               :body {:error "account-not-found"
+                      :message "Account not found"}})
+            
+            :insufficient-funds
+            (do
+              (log/warn "HTTP: Insufficient funds for transfer" error-data)
+              {:status 400
+               :body {:error "insufficient-funds"
+                      :message "Insufficient funds for transfer"}})
+            
+            :same-account-transfer
+            (do
+              (log/warn "HTTP: Cannot transfer to same account" error-data)
+              {:status 400
+               :body {:error "same-account-transfer"
+                      :message "Cannot transfer money to the same account"}})
+            
+            ;; default case
+            (do
+              (log/error e "HTTP: Error transferring between accounts")
+              {:status 500
+               :body {:error "internal-server-error"
+                      :message "Failed to transfer between accounts"}}))))
+      (catch Exception e
+        (log/error e "HTTP: Error transferring between accounts")
+        {:status 500
+         :body {:error "internal-server-error"
+                :message "Failed to transfer between accounts"}}))))
+
 (defn audit-handler
   "HTTP handler for retrieving account audit logs."
   [service]
@@ -209,6 +270,7 @@
    :view-account (view-account-handler service)
    :deposit (deposit-handler service)
    :withdraw (withdraw-handler service)
+   :transfer (transfer-handler service)
    :audit (audit-handler service)})
 
 ;; Integrant methods

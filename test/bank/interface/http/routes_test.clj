@@ -9,6 +9,7 @@
    :view-account (fn [_] {:status 200 :body {:account-number 123}})
    :deposit (fn [_] {:status 200 :body {:account-number 123}})
    :withdraw (fn [_] {:status 200 :body {:account-number 123}})
+   :transfer (fn [_] {:status 200 :body {:account-number 123}})
    :audit (fn [_] {:status 200 :body []})})
 
 (deftest create-routes-test
@@ -33,6 +34,7 @@
                         :view-account (constantly {:status 200})
                         :deposit (constantly {:status 202})
                         :withdraw (constantly {:status 203})
+                        :transfer (constantly {:status 205})
                         :audit (constantly {:status 204})}
           router (routes/create-router test-handlers)]
       

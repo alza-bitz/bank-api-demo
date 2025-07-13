@@ -274,3 +274,178 @@
       (let [body (json/read-value (:body response))]
         (is (= "account-not-found" (get body "error")))
         (is (= "Account not found" (get body "message")))))))
+
+(deftest transfer-money-integration-test
+  (testing "successful transfer between accounts"
+    (let [;; Create sender and receiver accounts
+          sender-account (service/create-account *service* "Sender")
+          receiver-account (service/create-account *service* "Receiver")
+          sender-number (:account-number sender-account)
+          receiver-number (:account-number receiver-account)
+
+          ;; Deposit initial amount to sender
+          _ (service/deposit-to-account *service* sender-number 100)
+
+          ;; Transfer money via HTTP
+          request {:request-method :post
+                   :uri (str "/account/" sender-number "/send")
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"amount" 30
+                           "account-number" receiver-number})}
+          response (*handler* request)]
+
+      (is (= 200 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= sender-number (get body "account-number")))
+        (is (= "Sender" (get body "name")))
+        (is (= 70 (get body "balance"))))
+
+      ;; Verify receiver account balance
+      (let [receiver-account (service/retrieve-account *service* receiver-number)]
+        (is (= 30 (:balance receiver-account))))))
+
+  (testing "transfer with insufficient funds returns 422"
+    (let [;; Create sender and receiver accounts
+          sender-account (service/create-account *service* "Poor Sender")
+          receiver-account (service/create-account *service* "Receiver")
+          sender-number (:account-number sender-account)
+          receiver-number (:account-number receiver-account)
+
+          ;; Deposit small amount to sender
+          _ (service/deposit-to-account *service* sender-number 10)
+
+          ;; Try to transfer more than available
+          request {:request-method :post
+                   :uri (str "/account/" sender-number "/send")
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"amount" 50
+                           "account-number" receiver-number})}
+          response (*handler* request)]
+
+      (is (= 422 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "insufficient-funds" (get body "error")))
+        (is (= "Insufficient funds for transfer" (get body "message"))))))
+
+  (testing "transfer to same account returns 422"
+    (let [;; Create account
+          account (service/create-account *service* "Self Transfer")
+          account-number (:account-number account)
+
+          ;; Deposit amount
+          _ (service/deposit-to-account *service* account-number 100)
+
+          ;; Try to transfer to same account
+          request {:request-method :post
+                   :uri (str "/account/" account-number "/send")
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"amount" 50
+                           "account-number" account-number})}
+          response (*handler* request)]
+
+      (is (= 422 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "same-account-transfer" (get body "error")))
+        (is (= "Cannot transfer to same account" (get body "message"))))))
+
+  (testing "transfer from non-existent account returns 404"
+    (let [;; Create receiver account
+          receiver-account (service/create-account *service* "Receiver")
+          receiver-number (:account-number receiver-account)
+
+          ;; Try to transfer from non-existent account
+          request {:request-method :post
+                   :uri "/account/999999/send"
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"amount" 50
+                           "account-number" receiver-number})}
+          response (*handler* request)]
+
+      (is (= 404 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "account-not-found" (get body "error")))
+        (is (= "Account not found" (get body "message"))))))
+
+  (testing "transfer to non-existent account returns 404"
+    (let [;; Create sender account
+          sender-account (service/create-account *service* "Sender")
+          sender-number (:account-number sender-account)
+
+          ;; Deposit amount
+          _ (service/deposit-to-account *service* sender-number 100)
+
+          ;; Try to transfer to non-existent account
+          request {:request-method :post
+                   :uri (str "/account/" sender-number "/send")
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"amount" 50
+                           "account-number" 999999})}
+          response (*handler* request)]
+
+      (is (= 404 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "account-not-found" (get body "error")))
+        (is (= "Account not found" (get body "message"))))))
+
+  (testing "transfer with invalid request body returns 400"
+    (let [;; Create account
+          sender-account (service/create-account *service* "Sender")
+          sender-number (:account-number sender-account)
+
+          ;; Try transfer with missing amount
+          request {:request-method :post
+                   :uri (str "/account/" sender-number "/send")
+                   :headers {"content-type" "application/json"}
+                   :body (json/write-value-as-string
+                          {"account-number" 123})}
+          response (*handler* request)]
+
+      (is (= 400 (:status response)))
+      (let [body (json/read-value (:body response))]
+        (is (= "validation-error" (get body "error"))))))
+
+  (testing "transfer audit log shows correct entries"
+    (let [;; Create sender and receiver accounts
+          sender-account (service/create-account *service* "Audit Sender")
+          receiver-account (service/create-account *service* "Audit Receiver")
+          sender-number (:account-number sender-account)
+          receiver-number (:account-number receiver-account)
+
+          ;; Initial deposit
+          _ (service/deposit-to-account *service* sender-number 100)
+
+          ;; Transfer money
+          _ (service/transfer-between-accounts *service* sender-number receiver-number 30)
+
+          ;; Check sender audit log
+          sender-request {:request-method :get
+                          :uri (str "/account/" sender-number "/audit")}
+          sender-response (*handler* sender-request)
+
+          ;; Check receiver audit log
+          receiver-request {:request-method :get
+                            :uri (str "/account/" receiver-number "/audit")}
+          receiver-response (*handler* receiver-request)]
+
+      ;; Verify sender audit log
+      (is (= 200 (:status sender-response)))
+      (let [sender-body (json/read-value (:body sender-response))]
+        (is (= 2 (count sender-body)))
+        (let [[transfer-event deposit-event] sender-body]
+          (is (= (str "send to #" receiver-number) (get transfer-event "description")))
+          (is (= 30 (get transfer-event "debit")))
+          (is (= "deposit" (get deposit-event "description")))
+          (is (= 100 (get deposit-event "credit")))))
+
+      ;; Verify receiver audit log  
+      (is (= 200 (:status receiver-response)))
+      (let [receiver-body (json/read-value (:body receiver-response))]
+        (is (= 1 (count receiver-body)))
+        (let [[receive-event] receiver-body]
+          (is (= (str "receive from #" sender-number) (get receive-event "description")))
+          (is (= 30 (get receive-event "credit"))))))))

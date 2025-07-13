@@ -111,6 +111,29 @@
     {:account updated-account
      :event withdraw-event}))
 
+(defn transfer
+  "Transfers amount from sender account to receiver account.
+   Returns map with updated accounts and events for both accounts.
+   Amount must be positive, sender must have sufficient funds,
+   and accounts must be different."
+  [sender-account receiver-account amount]
+  {:pre [(m/validate account-spec sender-account)
+         (m/validate account-spec receiver-account)
+         (pos? amount)]}
+  (when (= (:account-number sender-account) (:account-number receiver-account))
+    (throw (ex-info "Cannot transfer to same account" {:error :same-account-transfer
+                                                        :account-number (:account-number sender-account)})))
+  (when (< (:balance sender-account) amount)
+    (throw (ex-info "Insufficient funds" {:error :insufficient-funds
+                                          :balance (:balance sender-account)
+                                          :amount amount})))
+  (let [updated-sender (update sender-account :balance - amount)
+        updated-receiver (update receiver-account :balance + amount)
+        sender-event (create-account-event (str "send to #" (:account-number receiver-account)) {:debit amount})
+        receiver-event (create-account-event (str "receive from #" (:account-number sender-account)) {:credit amount})]
+    {:sender {:account updated-sender :event sender-event}
+     :receiver {:account updated-receiver :event receiver-event}}))
+
 ;; Validation functions
 (defn valid-account? [account]
   (m/validate account-spec account))

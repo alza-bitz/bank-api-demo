@@ -143,4 +143,54 @@
       (is (= 150 (:balance first-account)))
       (is (= 75 (:balance second-account))))))
 
+(deftest transfer-test
+  (testing "transfer updates both accounts correctly"
+    (let [sender (assoc (account/create-account "Sender") :account-number 1 :balance 100)
+          receiver (assoc (account/create-account "Receiver") :account-number 2 :balance 50)
+          result (account/transfer sender receiver 30)]
+      ;; Check sender account
+      (is (= 70 (get-in result [:sender :account :balance])))
+      (is (account/valid-account? (get-in result [:sender :account])))
+      ;; Check receiver account
+      (is (= 80 (get-in result [:receiver :account :balance])))
+      (is (account/valid-account? (get-in result [:receiver :account])))
+      ;; Check sender event
+      (is (account/valid-account-event? (get-in result [:sender :event])))
+      (is (= "send to #2" (get-in result [:sender :event :description])))
+      (is (= 30 (get-in result [:sender :event :action :debit])))
+      ;; Check receiver event
+      (is (account/valid-account-event? (get-in result [:receiver :event])))
+      (is (= "receive from #1" (get-in result [:receiver :event :description])))
+      (is (= 30 (get-in result [:receiver :event :action :credit])))))
+
+  (testing "transfer validates positive amount"
+    (let [sender (assoc (account/create-account "Sender") :account-number 1 :balance 100)
+          receiver (assoc (account/create-account "Receiver") :account-number 2 :balance 50)]
+      (is (thrown? AssertionError
+                   (account/transfer sender receiver 0)))
+      (is (thrown? AssertionError
+                   (account/transfer sender receiver -10)))))
+
+  (testing "transfer fails with insufficient funds"
+    (let [sender (assoc (account/create-account "Poor Sender") :account-number 1 :balance 25)
+          receiver (assoc (account/create-account "Receiver") :account-number 2 :balance 50)]
+      (is (= :insufficient-funds
+             (-> (try (account/transfer sender receiver 50)
+                      (catch clojure.lang.ExceptionInfo e (ex-data e)))
+                 :error)))))
+
+  (testing "transfer fails when accounts are the same"
+    (let [account (assoc (account/create-account "Same Account") :account-number 1 :balance 100)]
+      (is (= :same-account-transfer
+             (-> (try (account/transfer account account 30)
+                      (catch clojure.lang.ExceptionInfo e (ex-data e)))
+                 :error)))))
+
+  (testing "transfer can reduce sender balance to zero"
+    (let [sender (assoc (account/create-account "Zero Balance Sender") :account-number 1 :balance 75)
+          receiver (assoc (account/create-account "Receiver") :account-number 2 :balance 25)
+          result (account/transfer sender receiver 75)]
+      (is (= 0 (get-in result [:sender :account :balance])))
+      (is (= 100 (get-in result [:receiver :account :balance]))))))
+
 

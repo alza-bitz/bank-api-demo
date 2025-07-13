@@ -44,6 +44,18 @@
    [:name domain/account-name-spec]
    [:balance domain/account-balance-spec]])
 
+;; Transfer endpoint
+(def transfer-request-spec
+  [:map {:closed true}
+   [:amount [:int {:min 1}]]
+   [:account-number domain/account-number-spec]])
+
+(def transfer-response-spec
+  [:map {:closed true}
+   [:account-number domain/account-number-spec]
+   [:name domain/account-name-spec]
+   [:balance domain/account-balance-spec]])
+
 ;; Audit endpoint
 (def audit-response-item-spec
   [:map {:closed true}
@@ -98,6 +110,12 @@
 
 (defn valid-withdraw-response? [response]
   (m/validate withdraw-response-spec response))
+
+(defn valid-transfer-request? [request]
+  (m/validate transfer-request-spec request))
+
+(defn valid-transfer-response? [response]
+  (m/validate transfer-response-spec response))
 
 (defn valid-audit-response? [response]
   (m/validate audit-response-spec response))

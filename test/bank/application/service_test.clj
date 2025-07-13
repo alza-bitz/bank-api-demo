@@ -13,7 +13,11 @@
           save-account-spy (spy/spy (constantly saved-account))
           mock-repo (reify repo/AccountRepository
                       (save-account [_this account]
-                        (save-account-spy account)))
+                        (save-account-spy account))
+                      (save-account-events [_this _account-event-pairs] nil)
+                      (save-account-event [_this account _event] account)
+                      (find-account [_this _account-number] nil)
+                      (find-account-events [_this _account-number] []))
           service (service/->SyncAccountService mock-repo)
           created-account (service/create-account service "Jane Doe")]
 
@@ -29,7 +33,11 @@
           find-account-spy (spy/spy (constantly existing-account))
           mock-repo (reify repo/AccountRepository
                       (find-account [_this account-number]
-                        (find-account-spy account-number)))
+                        (find-account-spy account-number))
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account)
+                      (save-account-events [_this _account-event-pairs] nil)
+                      (find-account-events [_this _account-number] []))
           service (service/->SyncAccountService mock-repo)
           retrieved-account (service/retrieve-account service 456)]
 
@@ -216,3 +224,81 @@
            (service/retrieve-account-audit service 999)))
       (is (spy/called-once? find-account-spy)))))
 
+(deftest transfer-between-accounts-test
+  (testing "transfers money between accounts through service"
+    (let [sender-account {:id (random-uuid) :account-number 1 :name "Sender" :balance 100}
+          receiver-account {:id (random-uuid) :account-number 2 :name "Receiver" :balance 50}
+          find-account-spy (spy/spy (fn [account-number]
+                                     (case account-number
+                                       1 sender-account
+                                       2 receiver-account)))
+          save-account-events-spy (spy/spy (constantly nil))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account-events [_this account-event-pairs]
+                        (save-account-events-spy account-event-pairs))
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account)
+                      (find-account-events [_this _account-number] []))
+          service (service/->SyncAccountService mock-repo)
+          result (service/transfer-between-accounts service 1 2 30)]
+
+      ;; Test sender account in result
+      (is (= 70 (:balance (:sender result))))
+      (is (= 1 (:account-number (:sender result))))
+      (is (= "Sender" (:name (:sender result))))
+      
+      ;; Test receiver account in result
+      (is (= 80 (:balance (:receiver result))))
+      (is (= 2 (:account-number (:receiver result))))
+      (is (= "Receiver" (:name (:receiver result))))
+      
+      ;; Test repository interactions
+      (is (spy/called-with? find-account-spy 1))
+      (is (spy/called-with? find-account-spy 2))
+      (is (spy/called-once? save-account-events-spy))))
+
+  (testing "throws exception when sender account not found"
+    (let [find-account-spy (spy/spy (fn [account-number]
+                                     (if (= account-number 1)
+                                       (throw (ex-info "Account not found" 
+                                                      {:error :account-not-found 
+                                                       :account-number account-number}))
+                                       {:id (random-uuid) :account-number 2 :name "Receiver" :balance 50})))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account-events [_this _account-event-pairs] nil)
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account)
+                      (find-account-events [_this _account-number] []))
+          service (service/->SyncAccountService mock-repo)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/transfer-between-accounts service 1 2 30)))
+      (is (spy/called-once? find-account-spy))))
+
+  (testing "throws exception when receiver account not found"
+    (let [find-account-spy (spy/spy (fn [account-number]
+                                     (if (= account-number 1)
+                                       {:id (random-uuid) :account-number 1 :name "Sender" :balance 100}
+                                       (throw (ex-info "Account not found" 
+                                                      {:error :account-not-found 
+                                                       :account-number account-number})))))
+          mock-repo (reify repo/AccountRepository
+                      (find-account [_this account-number]
+                        (find-account-spy account-number))
+                      (save-account-events [_this _account-event-pairs] nil)
+                      (save-account [_this account] account)
+                      (save-account-event [_this account _event] account)
+                      (find-account-events [_this _account-number] []))
+          service (service/->SyncAccountService mock-repo)]
+
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Account not found"
+           (service/transfer-between-accounts service 1 2 30)))
+      (is (spy/called-n-times? find-account-spy 2)))))

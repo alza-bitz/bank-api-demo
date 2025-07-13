@@ -10,6 +10,7 @@
   (retrieve-account [this account-number])
   (deposit-to-account [this account-number amount])
   (withdraw-from-account [this account-number amount])
+  (transfer-between-accounts [this sender-account-number receiver-account-number amount])
   (retrieve-account-audit [this account-number]))
 
 (defrecord SyncAccountService [repository]
@@ -37,6 +38,17 @@
           {updated-account :account withdraw-event :event} (domain/withdraw account amount)]
       (repo/save-account-event repository updated-account withdraw-event)
       updated-account))
+
+  (transfer-between-accounts [_ sender-account-number receiver-account-number amount]
+    (log/info "Transferring" amount "from account" sender-account-number "to account" receiver-account-number)
+    (let [sender-account (repo/find-account repository sender-account-number)
+          receiver-account (repo/find-account repository receiver-account-number)
+          {:keys [sender receiver]} (domain/transfer sender-account receiver-account amount)
+          account-event-pairs [{:account (:account sender) :event (:event sender)}
+                               {:account (:account receiver) :event (:event receiver)}]]
+      (repo/save-account-events repository account-event-pairs)
+      {:sender (:account sender)
+       :receiver (:account receiver)}))
 
   (retrieve-account-audit [_ account-number]
     (log/info "Retrieving audit log for account" account-number)
