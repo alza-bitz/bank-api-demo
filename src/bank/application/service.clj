@@ -61,11 +61,9 @@
 (defn- do-retrieve-account-audit
   "Shared implementation for account audit retrieval."
   [repository account-number]
-  (log/info "Retrieving audit log for account" account-number)
-  ;; First check if account exists by trying to retrieve it
-  (repo/find-account repository account-number)
-  ;; If no exception thrown, retrieve the events
-  (repo/find-account-events repository account-number))
+  (log/info "Retrieving audit log for account" account-number) 
+  (let [found-account (repo/find-account repository account-number)]
+    (repo/find-account-events repository (:account-number found-account))))
 
 (defrecord SyncAccountService [repository]
   AccountService
