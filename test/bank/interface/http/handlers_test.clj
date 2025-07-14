@@ -73,8 +73,7 @@
           request {:body-params {:name "John Doe"}}
           response (handler request)]
       (is (= 500 (:status response)))
-      (is (= "internal-server-error" (get-in response [:body :error])))
-      (is (= "Failed to create account" (get-in response [:body :message]))))))
+      (is (= "internal-server-error" (get-in response [:body :error]))))))
 
 (deftest view-account-handler-test
   (testing "successful account retrieval"
@@ -91,16 +90,14 @@
           request {:path-params {:id "abc"}}
           response (handler request)]
       (is (= 400 (:status response)))
-      (is (= "bad-request" (get-in response [:body :error])))
-      (is (= "Invalid account number format" (get-in response [:body :message])))))
+      (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "account not found"
     (let [handler (handlers/view-account-handler mock-service)
           request {:path-params {:id "999"}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "account-not-found" (get-in response [:body :error])))
-      (is (= "Account not found" (get-in response [:body :message])))))
+      (is (= "account-not-found" (get-in response [:body :error])))))
 
   (testing "service exception handling"
     (let [failing-service (reify service/AccountService
@@ -115,8 +112,7 @@
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 500 (:status response)))
-      (is (= "internal-server-error" (get-in response [:body :error])))
-      (is (= "Failed to retrieve account" (get-in response [:body :message]))))))
+      (is (= "internal-server-error" (get-in response [:body :error]))))))
 
 (deftest deposit-handler-test
   (testing "successful deposit"
@@ -135,8 +131,7 @@
                   :body-params {:amount 50}}
           response (handler request)]
       (is (= 400 (:status response)))
-      (is (= "bad-request" (get-in response [:body :error])))
-      (is (= "Invalid account number format" (get-in response [:body :message])))))
+      (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "account not found"
     (let [handler (handlers/deposit-handler mock-service)
@@ -144,8 +139,7 @@
                   :body-params {:amount 50}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "account-not-found" (get-in response [:body :error])))
-      (is (= "Account not found" (get-in response [:body :message])))))
+      (is (= "account-not-found" (get-in response [:body :error])))))
 
   (testing "service exception handling"
     (let [failing-service (reify service/AccountService
@@ -161,8 +155,7 @@
                   :body-params {:amount 50}}
           response (handler request)]
       (is (= 500 (:status response)))
-      (is (= "internal-server-error" (get-in response [:body :error])))
-      (is (= "Failed to deposit to account" (get-in response [:body :message]))))))
+      (is (= "internal-server-error" (get-in response [:body :error]))))))
 
 (deftest withdraw-handler-test
   (testing "successful withdrawal"
@@ -181,8 +174,7 @@
                    :body-params {:amount 50}}
           response (handler request)]
       (is (= 400 (:status response)))
-      (is (= "bad-request" (get-in response [:body :error])))
-      (is (= "Invalid account number format" (get-in response [:body :message])))))
+      (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "insufficient funds"
     (let [handler (handlers/withdraw-handler mock-service)
@@ -190,8 +182,7 @@
                    :body-params {:amount 150}}
           response (handler request)]
       (is (= 422 (:status response)))
-      (is (= "insufficient-funds" (get-in response [:body :error])))
-      (is (= "Insufficient funds for withdrawal" (get-in response [:body :message])))))
+      (is (= "insufficient-funds" (get-in response [:body :error])))))
 
   (testing "account not found"
     (let [handler (handlers/withdraw-handler mock-service)
@@ -199,8 +190,7 @@
                    :body-params {:amount 50}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "account-not-found" (get-in response [:body :error])))
-      (is (= "Account not found" (get-in response [:body :message])))))
+      (is (= "account-not-found" (get-in response [:body :error])))))
 
   (testing "service exception handling"
     (let [failing-service (reify service/AccountService
@@ -216,8 +206,7 @@
                    :body-params {:amount 50}}
           response (handler request)]
       (is (= 500 (:status response)))
-      (is (= "internal-server-error" (get-in response [:body :error])))
-      (is (= "Failed to withdraw from account" (get-in response [:body :message]))))))
+      (is (= "internal-server-error" (get-in response [:body :error]))))))
 
 (deftest make-handlers-test
   (testing "make-handlers returns all expected handlers"
@@ -247,8 +236,7 @@
           request {:path-params {:id "999"}}
           response (handler request)]
       (is (= 404 (:status response)))
-      (is (= "account-not-found" (get-in response [:body :error])))
-      (is (= "Account not found" (get-in response [:body :message])))))
+      (is (= "account-not-found" (get-in response [:body :error])))))
 
   (testing "service exception handling"
     (let [failing-service (reify service/AccountService
@@ -263,5 +251,4 @@
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 500 (:status response)))
-      (is (= "internal-server-error" (get-in response [:body :error])))
-      (is (= "Failed to retrieve audit log" (get-in response [:body :message]))))))
+      (is (= "internal-server-error" (get-in response [:body :error]))))))

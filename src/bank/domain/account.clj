@@ -103,7 +103,8 @@
   {:pre [(m/validate account-spec account)
          (pos? amount)]}
   (when (< (:balance account) amount)
-    (throw (ex-info "Insufficient funds" {:error :insufficient-funds 
+    (throw (ex-info "Insufficient funds" {:error :insufficient-funds
+                                          :message "Insufficient funds for withdrawal"
                                           :balance (:balance account) 
                                           :amount amount})))
   (let [updated-account (update account :balance - amount)
@@ -122,9 +123,11 @@
          (pos? amount)]}
   (when (= (:account-number sender-account) (:account-number receiver-account))
     (throw (ex-info "Cannot transfer to same account" {:error :same-account-transfer
+                                                        :message "Cannot transfer to same account"
                                                         :account-number (:account-number sender-account)})))
   (when (< (:balance sender-account) amount)
     (throw (ex-info "Insufficient funds" {:error :insufficient-funds
+                                          :message "Insufficient funds for transfer"
                                           :balance (:balance sender-account)
                                           :amount amount})))
   (let [updated-sender (update sender-account :balance - amount)

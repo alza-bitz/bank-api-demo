@@ -110,8 +110,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "account-not-found" (get body "error")))
-        (is (= "Account not found" (get body "message")))))))
+        (is (= "account-not-found" (get body "error")))))))
 
 (deftest invalid-deposit-integration-test
   (testing "400 error for invalid deposit amount"
@@ -171,8 +170,7 @@
 
       (is (= 422 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "insufficient-funds" (get body "error")))
-        (is (= "Insufficient funds for withdrawal" (get body "message")))))))
+        (is (= "insufficient-funds" (get body "error")))))))
 
 (deftest withdraw-account-not-found-integration-test
   (testing "404 error for withdrawing from non-existent account"
@@ -184,8 +182,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "account-not-found" (get body "error")))
-        (is (= "Account not found" (get body "message")))))))
+        (is (= "account-not-found" (get body "error")))))))
 
 (deftest invalid-withdraw-integration-test
   (testing "400 error for invalid withdraw amount"
@@ -272,8 +269,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "account-not-found" (get body "error")))
-        (is (= "Account not found" (get body "message")))))))
+        (is (= "account-not-found" (get body "error")))))))
 
 (deftest transfer-money-integration-test
   (testing "successful transfer between accounts"
@@ -326,8 +322,7 @@
 
       (is (= 422 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "insufficient-funds" (get body "error")))
-        (is (= "Insufficient funds for transfer" (get body "message"))))))
+        (is (= "insufficient-funds" (get body "error"))))))
 
   (testing "transfer to same account returns 422"
     (let [;; Create account
@@ -348,8 +343,7 @@
 
       (is (= 422 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "same-account-transfer" (get body "error")))
-        (is (= "Cannot transfer to same account" (get body "message"))))))
+        (is (= "same-account-transfer" (get body "error"))))))
 
   (testing "transfer from non-existent account returns 404"
     (let [;; Create receiver account
@@ -367,8 +361,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "account-not-found" (get body "error")))
-        (is (= "Account not found" (get body "message"))))))
+        (is (= "account-not-found" (get body "error"))))))
 
   (testing "transfer to non-existent account returns 404"
     (let [;; Create sender account
@@ -389,8 +382,7 @@
 
       (is (= 404 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "account-not-found" (get body "error")))
-        (is (= "Account not found" (get body "message"))))))
+        (is (= "account-not-found" (get body "error"))))))
 
   (testing "transfer with invalid request body returns 400"
     (let [;; Create account

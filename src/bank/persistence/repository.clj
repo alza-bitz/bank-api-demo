@@ -85,7 +85,8 @@
 
   (find-account [_ account-number]
     (or (sql/get-by-id datasource :account account-number :account_number {:builder-fn account-builder})
-        (throw (ex-info "Account not found" {:error :account-not-found 
+        (throw (ex-info "Account not found" {:error :account-not-found
+                                             :message "Account not found"
                                              :account-number account-number}))))
 
   (save-account-event

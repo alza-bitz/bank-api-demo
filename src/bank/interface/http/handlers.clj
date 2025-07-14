@@ -4,6 +4,31 @@
             [clojure.tools.logging :as log]
             [integrant.core :as ig]))
 
+(defn error-to-status-code
+  "Maps error keywords to HTTP status codes."
+  [error-key]
+  (case error-key
+    :account-not-found 404
+    :insufficient-funds 422
+    :same-account-transfer 422
+    :invalid-account-number 400
+    500)) ; default case
+
+(defn handle-exception
+  "Handles ExceptionInfo exceptions and converts them to HTTP responses."
+  [e default-message]
+  (if (instance? clojure.lang.ExceptionInfo e)
+    (let [{:keys [error message] :as error-data} (ex-data e)]
+      (log/error message error-data)
+      {:status (error-to-status-code error)
+       :body {:error (name error)
+              :message message}})
+    (do
+      (log/error e default-message)
+      {:status 500
+       :body {:error "internal-server-error"
+              :message default-message}})))
+
 (defn create-account-handler
   "HTTP handler for creating bank accounts."
   [service]
@@ -17,10 +42,7 @@
           {:status 200
            :body response}))
       (catch Exception e
-        (log/error e "HTTP: Error creating account")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to create account"}}))))
+        (handle-exception e "HTTP: Error creating account")))))
 
 (defn view-account-handler
   "HTTP handler for viewing bank accounts."
@@ -38,27 +60,8 @@
         {:status 400
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
-      (catch clojure.lang.ExceptionInfo e
-        (let [error-data (ex-data e)
-              error-key (:error error-data)]
-          (case error-key
-            :account-not-found
-            (do
-              (log/warn "HTTP: Account not found" (:account-number error-data))
-              {:status 404
-               :body {:error "account-not-found"
-                      :message "Account not found"}})
-            ;; default case
-            (do
-              (log/error e "HTTP: Error viewing account")
-              {:status 500
-               :body {:error "internal-server-error"
-                      :message "Failed to retrieve account"}}))))
       (catch Exception e
-        (log/error e "HTTP: Error viewing account")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to retrieve account"}}))))
+        (handle-exception e "HTTP: Error viewing account")))))
 
 (defn deposit-handler
   "HTTP handler for depositing money to accounts."
@@ -78,27 +81,8 @@
         {:status 400
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
-      (catch clojure.lang.ExceptionInfo e
-        (let [error-data (ex-data e)
-              error-key (:error error-data)]
-          (case error-key
-            :account-not-found
-            (do
-              (log/warn "HTTP: Account not found" (:account-number error-data))
-              {:status 404
-               :body {:error "account-not-found"
-                      :message "Account not found"}})
-            ;; default case
-            (do
-              (log/error e "HTTP: Error depositing to account")
-              {:status 500
-               :body {:error "internal-server-error"
-                      :message "Failed to deposit to account"}}))))
       (catch Exception e
-        (log/error e "HTTP: Error depositing to account")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to deposit to account"}}))))
+        (handle-exception e "HTTP: Error depositing to account")))))
 
 (defn withdraw-handler
   "HTTP handler for withdrawing money from accounts."
@@ -118,49 +102,23 @@
         {:status 400
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
-      (catch clojure.lang.ExceptionInfo e
-        (let [error-data (ex-data e)
-              error-key (:error error-data)]
-          (case error-key
-            :account-not-found
-            (do
-              (log/warn "HTTP: Account not found" (:account-number error-data))
-              {:status 404
-               :body {:error "account-not-found"
-                      :message "Account not found"}})
-            
-            :insufficient-funds
-            (do
-              (log/warn "HTTP: Insufficient funds for withdrawal" error-data)
-              {:status 422
-               :body {:error "insufficient-funds"
-                      :message "Insufficient funds for withdrawal"}})
-            
-            ;; default case
-            (do
-              (log/error e "HTTP: Error withdrawing from account")
-              {:status 500
-               :body {:error "internal-server-error"
-                      :message "Failed to withdraw from account"}}))))
       (catch Exception e
-        (log/error e "HTTP: Error withdrawing from account")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to withdraw from account"}}))))
+        (handle-exception e "HTTP: Error withdrawing from account")))))
 
 (defn transfer-handler
   "HTTP handler for transferring money between accounts."
   [service]
   (fn [request]
     (try
-      (let [sender-account-number (-> request :path-params :id Integer/parseInt)
+      (let [from-account-number (-> request :path-params :id Integer/parseInt)
             body (:body-params request)
             amount (:amount body)
-            receiver-account-number (:account-number body)]
-        (log/info "HTTP: Transferring" amount "from account" sender-account-number "to account" receiver-account-number)
-        (let [result (service/transfer-between-accounts service sender-account-number receiver-account-number amount)
+            to-account-number (:account-number body)]
+        (log/info "HTTP: Transferring" amount "from account" from-account-number "to account" to-account-number)
+        (let [result (service/transfer-between-accounts service from-account-number to-account-number amount)
               sender-account (:sender result)
               response (api/account->response sender-account)]
+          (log/info "HTTP: Transfer successful, returning response:" response)
           {:status 200
            :body response}))
       (catch NumberFormatException e
@@ -168,50 +126,17 @@
         {:status 400
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
-      (catch clojure.lang.ExceptionInfo e
-        (let [error-data (ex-data e)
-              error-key (:error error-data)]
-          (case error-key
-            :account-not-found
-            (do
-              (log/warn "HTTP: Account not found" (:account-number error-data))
-              {:status 404
-               :body {:error "account-not-found"
-                      :message "Account not found"}})
-            
-            :insufficient-funds
-            (do
-              (log/warn "HTTP: Insufficient funds for transfer" error-data)
-              {:status 422
-               :body {:error "insufficient-funds"
-                      :message "Insufficient funds for transfer"}})
-            
-            :same-account-transfer
-            (do
-              (log/warn "HTTP: Cannot transfer to same account" error-data)
-              {:status 422
-               :body {:error "same-account-transfer"
-                      :message "Cannot transfer to same account"}})
-            
-            ;; default case
-            (do
-              (log/error e "HTTP: Error transferring between accounts")
-              {:status 500
-               :body {:error "internal-server-error"
-                      :message "Failed to transfer between accounts"}}))))
       (catch Exception e
-        (log/error e "HTTP: Error transferring between accounts")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to transfer between accounts"}}))))
+        (log/error e "HTTP: Exception in transfer handler")
+        (handle-exception e "HTTP: Error transferring between accounts")))))
 
 (defn audit-handler
-  "HTTP handler for retrieving account audit logs."
+  "HTTP handler for viewing account audit logs."
   [service]
   (fn [request]
     (try
       (let [account-number (-> request :path-params :id Integer/parseInt)]
-        (log/info "HTTP: Retrieving audit log for account" account-number)
+        (log/info "HTTP: Getting audit log for account" account-number)
         (let [events (service/retrieve-account-audit service account-number)
               response (mapv api/account-event->response events)]
           {:status 200
@@ -221,34 +146,11 @@
         {:status 400
          :body {:error "bad-request"
                 :message "Invalid account number format"}})
-      (catch clojure.lang.ExceptionInfo e
-        (let [error-data (ex-data e)
-              error-key (:error error-data)]
-          (case error-key
-            :account-not-found
-            (do
-              (log/warn "HTTP: Account not found" (:account-number error-data))
-              {:status 404
-               :body {:error "account-not-found"
-                      :message "Account not found"}})
-            ;; default case
-            (do
-              (log/error e "HTTP: Error retrieving audit log")
-              {:status 500
-               :body {:error "internal-server-error"
-                      :message "Failed to retrieve audit log"}}))))
       (catch Exception e
-        (log/error e "HTTP: Error retrieving audit log")
-        {:status 500
-         :body {:error "internal-server-error"
-                :message "Failed to retrieve audit log"}}))))
-
-(defrecord HttpHandlers [service]
-  Object
-  (toString [_] "HttpHandlers"))
+        (handle-exception e "HTTP: Error getting audit log")))))
 
 (defn make-handlers
-  "Creates HTTP handlers with service dependency."
+  "Creates a map of all handlers with a given service."
   [service]
   {:create-account (create-account-handler service)
    :view-account (view-account-handler service)
@@ -257,10 +159,5 @@
    :transfer (transfer-handler service)
    :audit (audit-handler service)})
 
-;; Integrant methods
-(defmethod ig/init-key ::handlers [_ {:keys [service]}]
+(defmethod ig/init-key :handlers/account [_ {:keys [service]}]
   (make-handlers service))
-
-(defmethod ig/halt-key! ::handlers [_ _]
-  ;; No cleanup needed for handlers
-  nil)
