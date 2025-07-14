@@ -1,4 +1,4 @@
-(ns bank.interface.http.integration-test
+(ns bank.interface.http.handler-integration-test
   (:require
    [bank.application.service :as service]
    [bank.interface.http.handlers :as handlers]
