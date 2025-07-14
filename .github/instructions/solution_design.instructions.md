@@ -55,3 +55,5 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - The system layer will include a main function to start the system.
 - The system layer will include a shutdown hook to stop the system.
 - The configured system should use the JdbcAccountRepository with a Hikari connection pool. The pool should be closed when the system is stopped.
+- 
+- Integration tests should assert the system can be started without errors, and a started system can be stopped without errors.

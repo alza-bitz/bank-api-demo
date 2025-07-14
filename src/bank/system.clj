@@ -2,16 +2,13 @@
   (:require [integrant.core :as ig]
             [clojure.tools.logging :as log]
             [bank.persistence.repository :as repo])
-  (:gen-class))
+  (:gen-class)
+  (:import [com.zaxxer.hikari HikariDataSource HikariConfig]))
 
-(def system-config
+(def default-config
   "System configuration for the banking application."
-  {:db/datasource {:dbtype "postgresql"
-                   :host "localhost"
-                   :port 5432
-                   :dbname "bankdb"
-                   :user "bankuser"
-                   :password "bankpass"}
+
+  {:db/datasource {}
    
    :bank.persistence.repository/repository {:datasource (ig/ref :db/datasource)}
    
@@ -27,22 +24,42 @@
 (defn read-config
   "Reads system configuration from environment variables or uses defaults."
   []
-  (let [db-config {:dbtype "postgresql"
-                   :host (or (System/getenv "DATABASE_HOST") "localhost")
-                   :port (Integer/parseInt (or (System/getenv "DATABASE_PORT") "5432"))
-                   :dbname (or (System/getenv "DATABASE_NAME") "bankdb")
-                   :user (or (System/getenv "DATABASE_USER") "bankuser")
-                   :password (or (System/getenv "DATABASE_PASSWORD") "bankpass")}
+  (let [db-host (or (System/getenv "DATABASE_HOST") "localhost")
+        db-port (or (System/getenv "DATABASE_PORT") "5432")
+        db-name (or (System/getenv "DATABASE_NAME") "bankdb")
+        db-user (or (System/getenv "DATABASE_USER") "bankuser")
+        db-password (or (System/getenv "DATABASE_PASSWORD") "bankpass")
+        jdbc-url (str "jdbc:postgresql://" db-host ":" db-port "/" db-name)
+        hikari-config {:jdbcUrl jdbc-url
+                       :username db-user
+                       :password db-password
+                       :maximumPoolSize (Integer/parseInt (or (System/getenv "DB_MAX_POOL_SIZE") "10"))
+                       :minimumIdle (Integer/parseInt (or (System/getenv "DB_MIN_IDLE") "2"))
+                       :connectionTimeout (Integer/parseInt (or (System/getenv "DB_CONNECTION_TIMEOUT") "30000"))
+                       :idleTimeout (Integer/parseInt (or (System/getenv "DB_IDLE_TIMEOUT") "600000"))
+                       :maxLifetime (Integer/parseInt (or (System/getenv "DB_MAX_LIFETIME") "1800000"))}
         http-port (Integer/parseInt (or (System/getenv "HTTP_PORT") "3000"))]
-    (-> system-config
-        (assoc-in [:db/datasource] db-config)
+    (-> default-config
+        (assoc-in [:db/datasource] hikari-config)
         (assoc-in [:bank.interface.http.server/server :port] http-port))))
 
-(defn create-datasource
-  "Creates a datasource for the given configuration."
-  [config]
-  (log/info "Creating datasource for" (select-keys config [:host :port :dbname :user]))
-  config)
+(defn create-hikari-datasource
+  "Creates a HikariCP datasource from the configuration."
+  [hikari-config]
+  (log/info "Creating HikariCP datasource with config:" (dissoc hikari-config :password))
+  (let [config (HikariConfig.)]
+    (doseq [[k v] hikari-config]
+      (case k
+        :jdbcUrl (.setJdbcUrl config v)
+        :username (.setUsername config v)
+        :password (.setPassword config v)
+        :maximumPoolSize (.setMaximumPoolSize config v)
+        :minimumIdle (.setMinimumIdle config v)
+        :connectionTimeout (.setConnectionTimeout config v)
+        :idleTimeout (.setIdleTimeout config v)
+        :maxLifetime (.setMaxLifetime config v)
+        (log/warn "Unknown HikariCP config key:" k)))
+    (HikariDataSource. config)))
 
 (defn init-database
   "Initializes the database schema."
@@ -57,15 +74,19 @@
       (throw e))))
 
 ;; Integrant methods for datasource
-(defmethod ig/init-key :db/datasource [_ config]
-  (let [datasource (create-datasource config)]
+(defmethod ig/init-key :db/datasource [_ hikari-config]
+  (log/info "Initializing HikariCP configuration")
+  (let [datasource (create-hikari-datasource hikari-config)]
     (init-database datasource)))
 
-(defmethod ig/halt-key! :db/datasource [_ _]
-  (log/info "Datasource stopped")
+(defmethod ig/halt-key! :db/datasource [_ datasource]
+  (log/info "Closing HikariCP datasource")
+  (when datasource
+    (.close datasource))
+  (log/info "HikariCP configuration stopped")
   nil)
 
-(def ^:private system-atom (atom nil))
+(def system-atom (atom nil))
 
 (defn start-system!
   "Starts the system with the given configuration."

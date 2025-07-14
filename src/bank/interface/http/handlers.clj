@@ -159,5 +159,5 @@
    :transfer (transfer-handler service)
    :audit (audit-handler service)})
 
-(defmethod ig/init-key :handlers/account [_ {:keys [service]}]
+(defmethod ig/init-key ::handlers [_ {:keys [service]}]
   (make-handlers service))
