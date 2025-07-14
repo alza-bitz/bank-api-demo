@@ -22,7 +22,6 @@ applyTo: '**'
 - To get the mapped port for a test container use `(get (:mapped-ports started-container) source-port)`
 - To stop a test container use `(tc/stop! started-container)`
 
-
 - There are two tables, account and account_event
 - For account, primary key is account number, auto increment
 - For account_event, primary key is sequence number, auto increment
@@ -36,3 +35,7 @@ applyTo: '**'
 
 # Interface layer
 - Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers
+
+# Interface layer (asynchronous API)
+- The concurrent tests should use a Hikari connection pool for the persistence layer.
+- The concurrent tests might need to consider the size of pool and queue length for the Hikari connection pool.
