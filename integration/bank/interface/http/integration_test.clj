@@ -156,7 +156,7 @@
         (is (= account-number (get body "account-number")))))))
 
 (deftest withdraw-insufficient-funds-integration-test
-  (testing "400 error for insufficient funds"
+  (testing "422 error for insufficient funds"
     (let [;; First create an account with small deposit
           created-account (service/create-account *service* "Poor User")
           account-number (:account-number created-account)
@@ -169,7 +169,7 @@
                    :body (json/write-value-as-string {:amount 100})}
           response (*handler* request)]
 
-      (is (= 400 (:status response)))
+      (is (= 422 (:status response)))
       (let [body (json/read-value (:body response))]
         (is (= "insufficient-funds" (get body "error")))
         (is (= "Insufficient funds for withdrawal" (get body "message")))))))
@@ -407,7 +407,9 @@
 
       (is (= 400 (:status response)))
       (let [body (json/read-value (:body response))]
-        (is (= "validation-error" (get body "error"))))))
+        ;; Reitit coercion returns "type" field instead of "error"
+        (is (= "reitit.coercion/request-coercion" (get body "type")))
+        (is (contains? (get body "humanized") "amount")))))
 
   (testing "transfer audit log shows correct entries"
     (let [;; Create sender and receiver accounts

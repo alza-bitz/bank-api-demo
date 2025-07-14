@@ -29,96 +29,96 @@
     ["/swagger.json"
      {:get {:no-doc true
             :swagger {:info {:title "Banking API"
-                           :description "HTTP API for managing banking accounts"
-                           :version "1.0.0"}}
+                             :description "HTTP API for managing banking accounts"
+                             :version "1.0.0"}}
             :handler (openapi/create-openapi-handler)}}]
-    
+
     ["/account"
      {:swagger {:tags ["accounts"]}}
-     
-     ["" 
+
+     [""
       {:post {:summary "Create a bank account"
               :description "Creates a new bank account with the given name and initial balance of 0"
               :parameters {:body api/create-account-request-spec}
               :responses {200 {:body api/create-account-response-spec
-                              :description "Account created successfully"}
-                         400 {:body api/error-response-spec
-                              :description "Invalid request"}
-                         500 {:body api/error-response-spec
-                              :description "Internal server error"}}
+                               :description "Account created successfully"}
+                          400 {:body api/error-response-spec
+                               :description "Invalid request"}
+                          500 {:body api/error-response-spec
+                               :description "Internal server error"}}
               :handler (:create-account handlers)}}]
-     
+
      ["/:id"
       {:get {:summary "View a bank account"
              :description "Retrieves an existing bank account by account number"
              :parameters {:path [:map [:id :int]]}
              :responses {200 {:body api/view-account-response-spec
-                             :description "Account retrieved successfully"}
-                        400 {:body api/error-response-spec
-                             :description "Invalid account number"}
-                        404 {:body api/error-response-spec
-                             :description "Account not found"}
-                        500 {:body api/error-response-spec
-                             :description "Internal server error"}}
+                              :description "Account retrieved successfully"}
+                         400 {:body api/error-response-spec
+                              :description "Invalid account number"}
+                         404 {:body api/error-response-spec
+                              :description "Account not found"}
+                         500 {:body api/error-response-spec
+                              :description "Internal server error"}}
              :handler (:view-account handlers)}}]
-     
+
      ["/:id/deposit"
       {:post {:summary "Deposit money to an account"
               :description "Deposits a positive amount of money to an existing bank account"
               :parameters {:path [:map [:id :int]]
-                          :body api/deposit-request-spec}
+                           :body api/deposit-request-spec}
               :responses {200 {:body api/deposit-response-spec
-                              :description "Deposit completed successfully"}
+                               :description "Deposit completed successfully"}
+                          400 {:body api/error-response-spec
+                               :description "Invalid request"}
+                          404 {:body api/error-response-spec
+                               :description "Account not found"}
+                          500 {:body api/error-response-spec
+                               :description "Internal server error"}}
+              :handler (:deposit handlers)}}]
+
+     ["/:id/withdraw"
+      {:post {:summary "Withdraw money from an account"
+              :description "Withdraws a positive amount of money from an existing bank account. The resulting balance must not fall below zero."
+              :parameters {:path [:map [:id :int]]
+                           :body api/withdraw-request-spec}
+              :responses {200 {:body api/withdraw-response-spec
+                               :description "Withdrawal completed successfully"}
+                          400 {:body api/error-response-spec
+                               :description "Invalid request or insufficient funds"}
+                          404 {:body api/error-response-spec
+                               :description "Account not found"}
+                          500 {:body api/error-response-spec
+                               :description "Internal server error"}}
+              :handler (:withdraw handlers)}}]
+
+     ["/:id/send"
+      {:post {:summary "Transfer money to another account"
+              :description "Transfers money from one existing account to another existing account. You cannot transfer money from an account to itself. The resulting balance of the sending account must not fall below zero."
+              :parameters {:path [:map [:id :int]]
+                           :body api/transfer-request-spec}
+              :responses {200 {:body api/transfer-response-spec
+                               :description "Transfer completed successfully"}
+                          400 {:body api/error-response-spec
+                               :description "Invalid request, insufficient funds, or same account transfer"}
+                          404 {:body api/error-response-spec
+                               :description "Account not found"}
+                          500 {:body api/error-response-spec
+                               :description "Internal server error"}}
+              :handler (:transfer handlers)}}]
+
+     ["/:id/audit"
+      {:get {:summary "Retrieve account audit log"
+             :description "Retrieves the audit log of an account. The audit log consists of records describing the events on the account in reverse chronological order."
+             :parameters {:path [:map [:id :int]]}
+             :responses {200 {:body api/audit-response-spec
+                              :description "Audit log retrieved successfully"}
                          400 {:body api/error-response-spec
                               :description "Invalid request"}
                          404 {:body api/error-response-spec
                               :description "Account not found"}
                          500 {:body api/error-response-spec
                               :description "Internal server error"}}
-              :handler (:deposit handlers)}}]
-     
-     ["/:id/withdraw"
-      {:post {:summary "Withdraw money from an account"
-              :description "Withdraws a positive amount of money from an existing bank account. The resulting balance must not fall below zero."
-              :parameters {:path [:map [:id :int]]
-                          :body api/withdraw-request-spec}
-              :responses {200 {:body api/withdraw-response-spec
-                              :description "Withdrawal completed successfully"}
-                         400 {:body api/error-response-spec
-                              :description "Invalid request or insufficient funds"}
-                         404 {:body api/error-response-spec
-                              :description "Account not found"}
-                         500 {:body api/error-response-spec
-                              :description "Internal server error"}}
-              :handler (:withdraw handlers)}}]
-     
-     ["/:id/send"
-      {:post {:summary "Transfer money to another account"
-              :description "Transfers money from one existing account to another existing account. You cannot transfer money from an account to itself. The resulting balance of the sending account must not fall below zero."
-              :parameters {:path [:map [:id :int]]
-                          :body api/transfer-request-spec}
-              :responses {200 {:body api/transfer-response-spec
-                              :description "Transfer completed successfully"}
-                         400 {:body api/error-response-spec
-                              :description "Invalid request, insufficient funds, or same account transfer"}
-                         404 {:body api/error-response-spec
-                              :description "Account not found"}
-                         500 {:body api/error-response-spec
-                              :description "Internal server error"}}
-              :handler (:transfer handlers)}}]
-     
-     ["/:id/audit"
-      {:get {:summary "Retrieve account audit log"
-             :description "Retrieves the audit log of an account. The audit log consists of records describing the events on the account in reverse chronological order."
-             :parameters {:path [:map [:id :int]]}
-             :responses {200 {:body api/audit-response-spec
-                             :description "Audit log retrieved successfully"}
-                        400 {:body api/error-response-spec
-                             :description "Invalid request"}
-                        404 {:body api/error-response-spec
-                             :description "Account not found"}
-                        500 {:body api/error-response-spec
-                             :description "Internal server error"}}
              :handler (:audit handlers)}}]]]])
 
 (defn create-router

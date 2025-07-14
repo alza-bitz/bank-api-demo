@@ -12,14 +12,10 @@
       (let [body (:body-params request)
             name (:name body)]
         (log/info "HTTP: Creating account for" name)
-        (if (api/valid-create-account-request? body)
-          (let [account (service/create-account service name)
-                response (api/account->response account)]
-            {:status 200
-             :body response})
-          {:status 400
-           :body {:error "bad-request"
-                  :message "Invalid request body"}}))
+        (let [account (service/create-account service name)
+              response (api/account->response account)]
+          {:status 200
+           :body response}))
       (catch Exception e
         (log/error e "HTTP: Error creating account")
         {:status 500
@@ -73,14 +69,10 @@
             body (:body-params request)
             amount (:amount body)]
         (log/info "HTTP: Depositing" amount "to account" account-number)
-        (if (api/valid-deposit-request? body)
-          (let [account (service/deposit-to-account service account-number amount)
-                response (api/account->response account)]
-            {:status 200
-             :body response})
-          {:status 400
-           :body {:error "bad-request"
-                  :message "Invalid request body"}}))
+        (let [account (service/deposit-to-account service account-number amount)
+              response (api/account->response account)]
+          {:status 200
+           :body response}))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -117,14 +109,10 @@
             body (:body-params request)
             amount (:amount body)]
         (log/info "HTTP: Withdrawing" amount "from account" account-number)
-        (if (api/valid-withdraw-request? body)
-          (let [account (service/withdraw-from-account service account-number amount)
-                response (api/account->response account)]
-            {:status 200
-             :body response})
-          {:status 400
-           :body {:error "bad-request"
-                  :message "Invalid request body"}}))
+        (let [account (service/withdraw-from-account service account-number amount)
+              response (api/account->response account)]
+          {:status 200
+           :body response}))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -144,7 +132,7 @@
             :insufficient-funds
             (do
               (log/warn "HTTP: Insufficient funds for withdrawal" error-data)
-              {:status 400
+              {:status 422
                :body {:error "insufficient-funds"
                       :message "Insufficient funds for withdrawal"}})
             
@@ -170,15 +158,11 @@
             amount (:amount body)
             receiver-account-number (:account-number body)]
         (log/info "HTTP: Transferring" amount "from account" sender-account-number "to account" receiver-account-number)
-        (if (api/valid-transfer-request? body)
-          (let [result (service/transfer-between-accounts service sender-account-number receiver-account-number amount)
-                sender-account (:sender result)
-                response (api/account->response sender-account)]
-            {:status 200
-             :body response})
-          {:status 400
-           :body {:error "bad-request"
-                  :message "Invalid request body"}}))
+        (let [result (service/transfer-between-accounts service sender-account-number receiver-account-number amount)
+              sender-account (:sender result)
+              response (api/account->response sender-account)]
+          {:status 200
+           :body response}))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -198,16 +182,16 @@
             :insufficient-funds
             (do
               (log/warn "HTTP: Insufficient funds for transfer" error-data)
-              {:status 400
+              {:status 422
                :body {:error "insufficient-funds"
                       :message "Insufficient funds for transfer"}})
             
             :same-account-transfer
             (do
               (log/warn "HTTP: Cannot transfer to same account" error-data)
-              {:status 400
+              {:status 422
                :body {:error "same-account-transfer"
-                      :message "Cannot transfer money to the same account"}})
+                      :message "Cannot transfer to same account"}})
             
             ;; default case
             (do
