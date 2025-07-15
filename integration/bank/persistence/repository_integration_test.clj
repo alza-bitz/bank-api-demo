@@ -5,25 +5,11 @@
             [bank.domain.account :as account])
   (:import [com.zaxxer.hikari HikariConfig HikariDataSource]))
 
-(def ^:dynamic *container* nil)
+(def ^:dynamic *datasource* nil)
 
-(use-fixtures :once
-  (fn [f]
-    (let [container (-> {:image-name "postgres:13"
-                         :exposed-ports [5432]
-                         :env-vars {"POSTGRES_DB" "testdb"
-                                    "POSTGRES_USER" "testuser"
-                                    "POSTGRES_PASSWORD" "testpass"}
-                         :wait-for {:wait-strategy :port}}
-                        tc/create
-                        tc/start!)]
-      (try
-        (binding [*container* container]
-          (f))
-        (finally
-          (tc/stop! container))))))
+(def ^:dynamic *datasource-pooled* nil)
 
-(defn ->datasource 
+(defn ->datasource
   [container]
   {:dbtype "postgresql"
    :host "localhost"
@@ -32,7 +18,7 @@
    :user "testuser"
    :password "testpass"})
 
-(defn ->connection-pool
+(defn ->datasource-pooled
   [container]
   (let [config (doto (HikariConfig.)
                  (.setJdbcUrl (str "jdbc:postgresql://localhost:"
@@ -45,17 +31,33 @@
                  (.setConnectionTimeout 30000))]
     (HikariDataSource. config)))
 
-(def ^:dynamic *datasource* nil)
+(use-fixtures :once
+  (fn [f]
+    (let [container (-> {:image-name "postgres:13"
+                         :exposed-ports [5432]
+                         :env-vars {"POSTGRES_DB" "testdb"
+                                    "POSTGRES_USER" "testuser"
+                                    "POSTGRES_PASSWORD" "testpass"}
+                         :wait-for {:wait-strategy :port}}
+                        tc/create
+                        tc/start!)
+          datasource (->datasource container)
+          datasource-pooled (->datasource-pooled container)]
+      (try
+        (binding [*datasource* datasource
+                  *datasource-pooled* datasource-pooled]
+          (f))
+        (finally
+          (.close datasource-pooled)
+          (tc/stop! container))))))
 
 (use-fixtures :each
   (fn [f]
-    (let [datasource (->datasource *container*)]
-      (try
-        (repo/create-tables! datasource)
-        (binding [*datasource* datasource]
-          (f))
-        (finally
-          (repo/drop-tables! datasource))))))
+    (try
+      (repo/create-tables! *datasource*)
+      (f)
+      (finally
+        (repo/drop-tables! *datasource*)))))
 
 (deftest jdbc-repository-test
   (testing "save and find account"
@@ -117,8 +119,7 @@
 
 (deftest jdbc-repository-concurrent-sequence-test
   (testing "concurrent account events get correct sequence numbers with retry logic"
-    (let [pool (->connection-pool *container*)
-          repository (repo/logging-jdbc-account-repository pool)
+    (let [repository (repo/logging-jdbc-account-repository *datasource-pooled*)
           account (repo/save-account repository (account/create-account "Concurrent Test Account"))
           num-events 10
           saved-event-futures (doall
@@ -128,14 +129,11 @@
                                                 (repo/save-account-event repository updated-account event)))))
           saved-events (mapv deref saved-event-futures)
           sequences (mapv :sequence saved-events)]
-
-      (try
-        (is (= (set (map inc (range num-events))) (set sequences))
-            (str "Expected sequences 1-10, got: " (sort sequences)))
-        (is (every? #(= (:account-number account) (:account-number %)) saved-events))
-        (is (every? account/valid-saved-account-event? saved-events))
-        (finally
-          (.close pool))))))
+      
+      (is (= (set (map inc (range num-events))) (set sequences)) 
+                  (str "Expected sequences 1-10, got: " (sort sequences)))
+      (is (every? #(= (:account-number account) (:account-number %)) saved-events))
+      (is (every? account/valid-saved-account-event? saved-events)))))
 
 (deftest find-account-events-integration-test
   (testing "find-account-events returns events in reverse chronological order"

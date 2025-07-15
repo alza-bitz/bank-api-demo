@@ -5,13 +5,13 @@
             [bank.persistence.repository :as repo]
             [bank.application.service :as service]
             [bank.interface.http.routes :as routes]
-            [bank.interface.http.handlers :as handlers]))
+            [bank.interface.http.handlers :as handlers])
+  (:import [com.zaxxer.hikari HikariConfig HikariDataSource]))
 
 ;; Test container and services
-(def ^:dynamic *container* nil)
 (def ^:dynamic *datasource* nil)
+(def ^:dynamic *datasource-pooled* nil)
 (def ^:dynamic *sync-service* nil)
-(def ^:dynamic *async-service* nil)
 (def ^:dynamic *handler* nil)
 
 (defn ->datasource [container]
@@ -21,6 +21,19 @@
    :dbname "testdb"
    :user "testuser"
    :password "testpass"})
+
+(defn ->datasource-pooled
+  [container]
+  (let [config (doto (HikariConfig.)
+                 (.setJdbcUrl (str "jdbc:postgresql://localhost:"
+                                   (get (:mapped-ports container) 5432)
+                                   "/testdb"))
+                 (.setUsername "testuser")
+                 (.setPassword "testpass")
+                 (.setMaximumPoolSize 20)
+                 (.setMinimumIdle 5)
+                 (.setConnectionTimeout 30000))]
+    (HikariDataSource. config)))
 
 (use-fixtures :once
   (fn [f]
@@ -33,19 +46,20 @@
                         tc/create
                         tc/start!)
           datasource (->datasource container)
-          repository (repo/logging-jdbc-account-repository datasource)
+          datasource-pooled (->datasource-pooled container)
+          repository (repo/logging-jdbc-account-repository datasource-pooled)
           sync-service (service/->SyncAccountService repository)
           async-service (service/consumer-pool-async-account-service repository 5)
           handler (routes/create-handler (handlers/make-handlers sync-service async-service))]
       (try
-        (binding [*container* container
-                  *datasource* datasource
+        (binding [*datasource* datasource
+                  *datasource-pooled* datasource-pooled
                   *sync-service* sync-service
-                  *async-service* async-service
                   *handler* handler]
           (f))
         (finally
           (service/stop async-service)
+          (.close datasource-pooled)
           (tc/stop! container))))))
 
 (use-fixtures :each
@@ -65,16 +79,7 @@
                           :headers {"content-type" "application/json"}
                           :body (json/write-value-as-string {:name "Async Test User"})}
           submit-response (*handler* submit-request)
-          submit-body (try 
-                        (if (instance? java.io.ByteArrayInputStream (:body submit-response))
-                          (let [body-str (slurp (:body submit-response))]
-                            (json/read-value body-str))
-                          (if (string? (:body submit-response))
-                            (json/read-value (:body submit-response))
-                            (:body submit-response)))
-                        (catch Exception e
-                          (println "Failed to parse submit response body:" e)
-                          {}))
+          submit-body (json/read-value (:body submit-response))
           operation-id (get submit-body "operation-id")
           
           ;; Wait for async operation to complete
@@ -84,16 +89,7 @@
           result-request {:request-method :get
                           :uri (str "/operation/" operation-id)}
           result-response (*handler* result-request)
-          result-body (try
-                        (if (instance? java.io.ByteArrayInputStream (:body result-response))
-                          (let [body-str (slurp (:body result-response))]
-                            (json/read-value body-str))
-                          (if (string? (:body result-response))
-                            (json/read-value (:body result-response))
-                            (:body result-response)))
-                        (catch Exception e
-                          (println "Failed to parse result response body:" e)
-                          {}))
+          result-body (json/read-value (:body result-response))
           account (get result-body "result")]
       
       (is (= 202 (:status submit-response)))

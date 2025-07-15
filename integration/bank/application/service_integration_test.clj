@@ -5,7 +5,17 @@
             [bank.application.service :as service]
             [bank.domain.account :as account]))
 
-(def ^:dynamic *container* nil)
+(def ^:dynamic *datasource* nil)
+
+(def ^:dynamic *repository* nil)
+
+(defn ->datasource [container]
+  {:dbtype "postgresql"
+   :host "localhost"
+   :port (get (:mapped-ports container) 5432)
+   :dbname "testdb"
+   :user "testuser"
+   :password "testpass"})
 
 (use-fixtures :once
   (fn [f]
@@ -16,33 +26,23 @@
                                     "POSTGRES_PASSWORD" "testpass"}
                          :wait-for {:wait-strategy :port}}
                         tc/create
-                        tc/start!)]
+                        tc/start!)
+          datasource (->datasource container)
+          repository (repo/logging-jdbc-account-repository datasource)]
       (try
-        (binding [*container* container]
+        (binding [*datasource* datasource
+                  *repository* repository]
           (f))
         (finally
           (tc/stop! container))))))
 
-(defn ->datasource [container]
-  {:dbtype "postgresql"
-   :host "localhost"
-   :port (get (:mapped-ports container) 5432)
-   :dbname "testdb"
-   :user "testuser"
-   :password "testpass"})
-
-(def ^:dynamic *repository* nil)
-
 (use-fixtures :each
   (fn [f]
-    (let [datasource (->datasource *container*)
-          repository (repo/logging-jdbc-account-repository datasource)]
-      (try
-        (repo/create-tables! datasource)
-        (binding [*repository* repository]
-          (f))
-        (finally
-          (repo/drop-tables! datasource))))))
+    (try
+      (repo/create-tables! *datasource*)
+      (f)
+      (finally
+        (repo/drop-tables! *datasource*)))))
 
 (deftest account-service-integration-test
   (testing "create account end-to-end"
