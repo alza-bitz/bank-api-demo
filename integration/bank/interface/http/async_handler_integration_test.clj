@@ -31,8 +31,8 @@
                                    "/testdb"))
                  (.setUsername "testuser")
                  (.setPassword "testpass")
-                 (.setMaximumPoolSize 20)
-                 (.setMinimumIdle 5)
+                 (.setMaximumPoolSize 50)
+                 (.setMinimumIdle 10)
                  (.setConnectionTimeout 30000))]
     (HikariDataSource. config)))
 
@@ -50,7 +50,7 @@
           datasource-pooled (->datasource-pooled container)
           repository (repo/logging-jdbc-account-repository datasource-pooled)
           sync-service (service/->SyncAccountService repository)
-          async-service (service/consumer-pool-async-account-service repository 5)
+          async-service (service/consumer-pool-async-account-service repository 20)
           handler (routes/create-handler (handlers/make-handlers sync-service async-service))]
       (try
         (binding [*datasource* datasource
@@ -350,17 +350,22 @@
         (is (every? #(= 0 (get % "balance")) retrieved-accounts))))))
 
 (deftest concurrent-async-mixed-operations-test
-  (testing "concurrent async mixed operations (deposit, withdraw, transfer) via handler"
-    ;; Create initial accounts for transfers
-    (let [accounts (repeatedly 20 #(service/create-account *sync-service* 
+  (testing "1000 concurrent async mixed operations (deposit, withdraw, transfer) via handler"
+    ;; Create initial accounts for transfers - need enough accounts for the operations
+    (let [accounts (repeatedly 500 #(service/create-account *sync-service* 
                                                            (str "Concurrent Mixed " (rand-int 1000000))))
           account-numbers (map :account-number accounts)
           
-          ;; Fund some accounts for withdraw and transfer operations
-          _ (doseq [account-number (take 10 account-numbers)]
+          ;; Fund half the accounts for withdraw and transfer operations
+          _ (doseq [account-number (take 250 account-numbers)]
               (service/deposit-to-account *sync-service* account-number 1000))
           
-          ;; Submit mixed async operations concurrently
+          ;; Create 1000 mixed async operations:
+          ;; - 500 deposits (one per account)
+          ;; - 250 withdraws (on funded accounts)
+          ;; - 125 transfers (using 250 funded accounts in pairs)
+          ;; - 125 additional deposits to reach 1000 total
+          
           deposit-operations (pmap (fn [account-number]
                                      (let [request {:request-method :post
                                                     :uri (str "/account/" account-number "/deposit")
@@ -370,7 +375,7 @@
                                            response (*handler* request)
                                            body (json/read-value (:body response))]
                                        (get body "operation-id")))
-                                   account-numbers)
+                                   account-numbers) ; 500 deposits
           
           withdraw-operations (pmap (fn [account-number]
                                       (let [request {:request-method :post
@@ -381,7 +386,7 @@
                                             response (*handler* request)
                                             body (json/read-value (:body response))]
                                         (get body "operation-id")))
-                                    (take 10 account-numbers))
+                                    (take 250 account-numbers)) ; 250 withdraws
           
           transfer-operations (pmap (fn [[sender receiver]]
                                       (let [request {:request-method :post
@@ -393,9 +398,21 @@
                                             response (*handler* request)
                                             body (json/read-value (:body response))]
                                         (get body "operation-id")))
-                                    (partition 2 (take 10 account-numbers)))
+                                    (partition 2 (take 250 account-numbers))) ; 125 transfers (250 funded accounts in pairs)
           
-          all-operation-ids (concat deposit-operations withdraw-operations transfer-operations)
+          ;; Additional deposits to reach exactly 1000 operations
+          additional-deposits (pmap (fn [account-number]
+                                      (let [request {:request-method :post
+                                                     :uri (str "/account/" account-number "/deposit")
+                                                     :query-params {"async" "true"}
+                                                     :headers {"content-type" "application/json"}
+                                                     :body (json/write-value-as-string {:amount (+ 25 (rand-int 50))})}
+                                            response (*handler* request)
+                                            body (json/read-value (:body response))]
+                                        (get body "operation-id")))
+                                    (take 125 account-numbers)) ; 125 additional deposits
+          
+          all-operation-ids (concat deposit-operations withdraw-operations transfer-operations additional-deposits)
           
           ;; Retrieve all results
           results (pmap (fn [operation-id]
@@ -406,7 +423,7 @@
                         all-operation-ids)]
       
       ;; Verify all operations completed successfully
-      (is (= (+ 20 10 5) (count results))) ; 20 deposits + 10 withdraws + 5 transfers
+      (is (= 1000 (count results))) ; 500 deposits + 250 withdraws + 125 transfers + 125 additional deposits = 1000 operations
       (is (every? #(= "completed" (get % "status")) results))
       
       ;; Verify no operation failed

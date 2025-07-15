@@ -66,7 +66,7 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 
 # Interface layer (asynchronous API)
 - The HTTP API contract for the async API will need to deviate slightly from [problem_statement_and_requirements.instructions.md](problem_statement_and_requirements.instructions.md).
-- If the query string includes async=true, then existing endpoints will all return an operation submit response with the operation id, instead of the existing sync respsonses.
+- If the query string includes async=true, then existing endpoints will all use the async account service to return an operation submit response with the operation id, instead of the existing sync respsonses.
 - There will be an additional new endpoint, GET /operation/:id/ that calls the AsyncOperationProducer retrieve-operation-result function, converts the operation result to an operation result repsonse and serialises to JSON as per the other API routes.
 - 
 - Integration tests will include end-to-end tests that reconcile the operation id in the operation submit response with the operation id in an operation result response.
