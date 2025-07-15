@@ -1,5 +1,5 @@
 (ns user
-  (:require [bank.system]
+  (:require [bank.system :as system]
             [clojure.tools.namespace.repl :as repl]))
 
 ;; System management helpers for REPL development
@@ -20,6 +20,19 @@
   (reset))
 
 (comment
+  (def service
+    (-> system/system-atom
+        deref
+        :bank.application.service/service)))
+
+(comment
+  (bank.application.service/create-account service "It's me!")
+  (bank.application.service/deposit-to-account service 1 1)
+  (bank.application.service/withdraw-from-account service 1 1)
+  (bank.application.service/withdraw-from-account service 1 1)
+  (bank.application.service/retrieve-account-audit service 1))
+
+(comment
   (clojure.test/run-tests 'bank.domain.account-test))
 
 (comment
@@ -33,6 +46,9 @@
 
 (comment
   (clojure.test/run-tests 'bank.application.service-integration-test))
+
+(comment
+  (clojure.test/run-tests 'bank.interface.http.api-test))
 
 (comment
   (clojure.test/run-tests 'bank.interface.http.integration-test))
