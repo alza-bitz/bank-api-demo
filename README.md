@@ -134,6 +134,19 @@ The application can be configured using environment variables:
 
 ## Development
 
+### Implementation
+
+This project was implemented iteratively by feature slice and DDD layer. The implementation was guided by comprehensive instruction files located in `.github/instructions/`:
+
+- **[approach.instructions.md](.github/instructions/approach.instructions.md)**: Development approach using feature slices and DDD layers
+- **[problem_statement_and_requirements.instructions.md](.github/instructions/problem_statement_and_requirements.instructions.md)**: The original specification copied from [bank.md](https://gitlab.com/greenhousecode/lemonpi/hiring/-/blob/master/assignments/bank.md)
+- **[solution_design.instructions.md](.github/instructions/solution_design.instructions.md)**: Architecture design with synchronous and asynchronous implementations
+- **[solution_design_postgres.instructions.md](.github/instructions/solution_design_postgres.instructions.md)**: PostgreSQL persistence layer specifications
+- **[tests.instructions.md](.github/instructions/tests.instructions.md)**: Testing strategy and patterns
+- **[repl_and_deps.instructions.md](.github/instructions/repl_and_deps.instructions.md)**: REPL development workflow
+
+These instructions provide detailed guidance for extending the system, implementing new features, and maintaining code quality standards.
+
 ### Running Tests
 
 Unit tests:

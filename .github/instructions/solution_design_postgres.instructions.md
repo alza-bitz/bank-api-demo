@@ -3,8 +3,14 @@ applyTo: '**'
 ---
 
 # Persistence layer
-- Create a JdbcAccountRepository record implementing the AccountRepository protocol.
-- The repository will be updating or inserting on account and account_event tables.
+- Create a JdbcAccountRepository record implementing the AccountRepository protocol in a jdbc sub-namespace.
+- The repository uses the application database pattern over two tables, account and account_event.
+- For account, primary key is account number, auto increment.
+- For account_event, primary key is sequence number, auto increment.
+- For account_event there is an foreign key to account number in account.
+- For account creation, the db transaction would only insert in account table.
+- For account view, the db transaction would only select from account table.
+- For account events, the db transaction would update account table and insert in account_event table.
 - The repository will use the next.jdbc library for all database operations.
 - The local identity for account events can be implemented using the following sql statement: `insert into account_event (event_sequence, account_number) select coalesce(max(event_sequence), 0) + 1, ? from account_event where account_number = ?`
 - For concurrent saving of events on the same account, the repository can catch any exception resulting from the unique constraint violation and retry the operation.
@@ -21,14 +27,6 @@ applyTo: '**'
 - The Postgres container should only be made available to tests after asserting a successful connection
 - To get the mapped port for a test container use `(get (:mapped-ports started-container) source-port)`
 - To stop a test container use `(tc/stop! started-container)`
-
-- There are two tables, account and account_event
-- For account, primary key is account number, auto increment
-- For account_event, primary key is sequence number, auto increment
-- For account_event there is an foreign key to account number in account
-- For account creation, the db transaction would only insert in account table 
-- For account view, the db transaction would only select from account table
-- For account events, the db transaction would update account table and insert in account_event table
 
 # Application layer
 - Integration tests will use the real persistence layer, backed by a Postgres container managed with clj-test-containers/clj-test-containers

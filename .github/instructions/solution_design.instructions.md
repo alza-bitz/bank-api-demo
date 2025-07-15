@@ -23,7 +23,7 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - Use Malli to define specs for accounts, account actions and account events.
 
 # Persistence layer
-- Use the DDD repository pattern to create an AccountRepository protocol.
+- Use the DDD repository pattern to create an AccountRepository protocol in the top-level persistence namespace.
 - The repository will have a function for saving accounts that takes an account and returns a saved account.
 - The repository will have a function for finding an account by account number that returns the account or throws an ExceptionInfo with :error key :account-not-found
 - The repository will have a function for saving an account event that takes an account and the event and returns the saved account event.
