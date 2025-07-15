@@ -121,7 +121,6 @@
   [{:keys [state]}]
   (when-let [operation-channel (:operation-channel @state)]
     (close! operation-channel))
-  ;; Close all result channels
   (doseq [result-channel (vals (:result-channels @state))]
     (close! result-channel))
   (swap! state assoc

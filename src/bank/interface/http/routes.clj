@@ -73,6 +73,8 @@
                            :body api/deposit-request-spec}
               :responses {200 {:body api/deposit-response-spec
                                :description "Deposit completed successfully"}
+                          202 {:body api/operation-submit-response-spec
+                               :description "Operation submitted successfully (async mode)"}
                           400 {:body api/error-response-spec
                                :description "Invalid request"}
                           404 {:body api/error-response-spec
@@ -88,6 +90,8 @@
                            :body api/withdraw-request-spec}
               :responses {200 {:body api/withdraw-response-spec
                                :description "Withdrawal completed successfully"}
+                          202 {:body api/operation-submit-response-spec
+                               :description "Operation submitted successfully (async mode)"}
                           400 {:body api/error-response-spec
                                :description "Invalid request or insufficient funds"}
                           404 {:body api/error-response-spec
@@ -103,6 +107,8 @@
                            :body api/transfer-request-spec}
               :responses {200 {:body api/transfer-response-spec
                                :description "Transfer completed successfully"}
+                          202 {:body api/operation-submit-response-spec
+                               :description "Operation submitted successfully (async mode)"}
                           400 {:body api/error-response-spec
                                :description "Invalid request, insufficient funds, or same account transfer"}
                           404 {:body api/error-response-spec
@@ -117,6 +123,8 @@
              :parameters {:path [:map [:id :int]]}
              :responses {200 {:body api/audit-response-spec
                               :description "Audit log retrieved successfully"}
+                         202 {:body api/operation-submit-response-spec
+                              :description "Operation submitted successfully (async mode)"}
                          400 {:body api/error-response-spec
                               :description "Invalid request"}
                          404 {:body api/error-response-spec

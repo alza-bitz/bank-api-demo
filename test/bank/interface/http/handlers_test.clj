@@ -132,7 +132,7 @@
 
 (deftest deposit-handler-test
   (testing "successful deposit"
-    (let [handler (handlers/deposit-handler mock-service)
+    (let [handler (handlers/deposit-handler mock-service mock-service)
           request {:path-params {:id "123"}
                   :body-params {:amount 50}}
           response (handler request)]
@@ -142,7 +142,7 @@
       (is (= 150 (get-in response [:body :balance])))))
 
   (testing "invalid account number format"
-    (let [handler (handlers/deposit-handler mock-service)
+    (let [handler (handlers/deposit-handler mock-service mock-service)
           request {:path-params {:id "abc"}
                   :body-params {:amount 50}}
           response (handler request)]
@@ -150,7 +150,7 @@
       (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "account not found"
-    (let [handler (handlers/deposit-handler mock-service)
+    (let [handler (handlers/deposit-handler mock-service mock-service)
           request {:path-params {:id "999"}
                   :body-params {:amount 50}}
           response (handler request)]
@@ -166,7 +166,7 @@
                            (withdraw-from-account [_ _ _] nil)
                            (transfer-between-accounts [_ _ _ _] nil)
                            (retrieve-account-audit [_ _] nil))
-          handler (handlers/deposit-handler failing-service)
+          handler (handlers/deposit-handler failing-service failing-service)
           request {:path-params {:id "123"}
                   :body-params {:amount 50}}
           response (handler request)]
@@ -175,7 +175,7 @@
 
 (deftest withdraw-handler-test
   (testing "successful withdrawal"
-    (let [handler (handlers/withdraw-handler mock-service)
+    (let [handler (handlers/withdraw-handler mock-service mock-service)
           request {:path-params {:id "123"}
                    :body-params {:amount 50}}
           response (handler request)]
@@ -185,7 +185,7 @@
       (is (= 50 (get-in response [:body :balance])))))
 
   (testing "invalid account number format"
-    (let [handler (handlers/withdraw-handler mock-service)
+    (let [handler (handlers/withdraw-handler mock-service mock-service)
           request {:path-params {:id "abc"}
                    :body-params {:amount 50}}
           response (handler request)]
@@ -193,7 +193,7 @@
       (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "insufficient funds"
-    (let [handler (handlers/withdraw-handler mock-service)
+    (let [handler (handlers/withdraw-handler mock-service mock-service)
           request {:path-params {:id "123"}
                    :body-params {:amount 150}}
           response (handler request)]
@@ -201,7 +201,7 @@
       (is (= "insufficient-funds" (get-in response [:body :error])))))
 
   (testing "account not found"
-    (let [handler (handlers/withdraw-handler mock-service)
+    (let [handler (handlers/withdraw-handler mock-service mock-service)
           request {:path-params {:id "999"}
                    :body-params {:amount 50}}
           response (handler request)]
@@ -217,7 +217,7 @@
                              (throw (RuntimeException. "Database error")))
                            (transfer-between-accounts [_ _ _ _] nil)
                            (retrieve-account-audit [_ _] nil))
-          handler (handlers/withdraw-handler failing-service)
+          handler (handlers/withdraw-handler failing-service failing-service)
           request {:path-params {:id "123"}
                    :body-params {:amount 50}}
           response (handler request)]
@@ -237,7 +237,7 @@
 
 (deftest audit-handler-test
   (testing "successful audit retrieval"
-    (let [handler (handlers/audit-handler mock-service)
+    (let [handler (handlers/audit-handler mock-service mock-service)
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 200 (:status response)))
@@ -250,7 +250,7 @@
       (is (= 100 (get-in response [:body 1 :credit])))))
 
   (testing "account not found"
-    (let [handler (handlers/audit-handler mock-service)
+    (let [handler (handlers/audit-handler mock-service mock-service)
           request {:path-params {:id "999"}}
           response (handler request)]
       (is (= 404 (:status response)))
@@ -265,7 +265,7 @@
                            (transfer-between-accounts [_ _ _ _] nil)
                            (retrieve-account-audit [_ _]
                              (throw (RuntimeException. "Database error"))))
-          handler (handlers/audit-handler failing-service)
+          handler (handlers/audit-handler failing-service failing-service)
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 500 (:status response)))

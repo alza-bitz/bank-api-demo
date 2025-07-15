@@ -83,18 +83,25 @@
         (handle-exception e "HTTP: Error viewing account")))))
 
 (defn deposit-handler
-  "HTTP handler for depositing money to accounts."
-  [service]
+  "HTTP handler for depositing money to accounts. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [account-number (-> request :path-params :id Integer/parseInt)
             body (:body-params request)
             amount (:amount body)]
         (log/info "HTTP: Depositing" amount "to account" account-number)
-        (let [account (service/deposit-to-account service account-number amount)
-              response (api/account->response account)]
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/deposit-to-account async-service account-number amount)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return account
+          (let [account (service/deposit-to-account sync-service account-number amount)
+                response (api/account->response account)]
+            {:status 200
+             :body response})))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -104,18 +111,25 @@
         (handle-exception e "HTTP: Error depositing to account")))))
 
 (defn withdraw-handler
-  "HTTP handler for withdrawing money from accounts."
-  [service]
+  "HTTP handler for withdrawing money from accounts. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [account-number (-> request :path-params :id Integer/parseInt)
             body (:body-params request)
             amount (:amount body)]
         (log/info "HTTP: Withdrawing" amount "from account" account-number)
-        (let [account (service/withdraw-from-account service account-number amount)
-              response (api/account->response account)]
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/withdraw-from-account async-service account-number amount)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return account
+          (let [account (service/withdraw-from-account sync-service account-number amount)
+                response (api/account->response account)]
+            {:status 200
+             :body response})))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -125,8 +139,8 @@
         (handle-exception e "HTTP: Error withdrawing from account")))))
 
 (defn transfer-handler
-  "HTTP handler for transferring money between accounts."
-  [service]
+  "HTTP handler for transferring money between accounts. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [from-account-number (-> request :path-params :id Integer/parseInt)
@@ -134,12 +148,19 @@
             amount (:amount body)
             to-account-number (:account-number body)]
         (log/info "HTTP: Transferring" amount "from account" from-account-number "to account" to-account-number)
-        (let [result (service/transfer-between-accounts service from-account-number to-account-number amount)
-              sender-account (:sender result)
-              response (api/account->response sender-account)]
-          (log/info "HTTP: Transfer successful, returning response:" response)
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/transfer-between-accounts async-service from-account-number to-account-number amount)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return sender account
+          (let [result (service/transfer-between-accounts sync-service from-account-number to-account-number amount)
+                sender-account (:sender result)
+                response (api/account->response sender-account)]
+            (log/info "HTTP: Transfer successful, returning response:" response)
+            {:status 200
+             :body response})))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -150,16 +171,23 @@
         (handle-exception e "HTTP: Error transferring between accounts")))))
 
 (defn audit-handler
-  "HTTP handler for viewing account audit logs."
-  [service]
+  "HTTP handler for viewing account audit logs. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [account-number (-> request :path-params :id Integer/parseInt)]
         (log/info "HTTP: Getting audit log for account" account-number)
-        (let [events (service/retrieve-account-audit service account-number)
-              response (mapv api/account-event->response events)]
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/retrieve-account-audit async-service account-number)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return audit events
+          (let [events (service/retrieve-account-audit sync-service account-number)
+                response (mapv api/account-event->response events)]
+            {:status 200
+             :body response})))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -190,10 +218,10 @@
   [sync-service async-service]
   {:create-account (create-account-handler sync-service async-service)
    :view-account (view-account-handler sync-service async-service)
-   :deposit (deposit-handler sync-service)
-   :withdraw (withdraw-handler sync-service)
-   :transfer (transfer-handler sync-service)
-   :audit (audit-handler sync-service)
+   :deposit (deposit-handler sync-service async-service)
+   :withdraw (withdraw-handler sync-service async-service)
+   :transfer (transfer-handler sync-service async-service)
+   :audit (audit-handler sync-service async-service)
    :operation-result (operation-result-handler async-service)})
 
 (defmethod ig/init-key ::handlers [_ {:keys [sync-service async-service]}]
