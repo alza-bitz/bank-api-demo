@@ -38,10 +38,12 @@
 
      [""
       {:post {:summary "Create a bank account"
-              :description "Creates a new bank account with the given name and initial balance of 0"
+              :description "Creates a new bank account with the given name and initial balance of 0. Use query parameter async=true for asynchronous processing."
               :parameters {:body api/create-account-request-spec}
               :responses {200 {:body api/create-account-response-spec
-                               :description "Account created successfully"}
+                               :description "Account created successfully (sync mode)"}
+                          202 {:body api/operation-submit-response-spec
+                               :description "Operation submitted successfully (async mode)"}
                           400 {:body api/error-response-spec
                                :description "Invalid request"}
                           500 {:body api/error-response-spec
@@ -50,10 +52,12 @@
 
      ["/:id"
       {:get {:summary "View a bank account"
-             :description "Retrieves an existing bank account by account number"
+             :description "Retrieves an existing bank account by account number. Use query parameter async=true for asynchronous processing."
              :parameters {:path [:map [:id :int]]}
              :responses {200 {:body api/view-account-response-spec
-                              :description "Account retrieved successfully"}
+                              :description "Account retrieved successfully (sync mode)"}
+                         202 {:body api/operation-submit-response-spec
+                              :description "Operation submitted successfully (async mode)"}
                          400 {:body api/error-response-spec
                               :description "Invalid account number"}
                          404 {:body api/error-response-spec
@@ -119,7 +123,22 @@
                               :description "Account not found"}
                          500 {:body api/error-response-spec
                               :description "Internal server error"}}
-             :handler (:audit handlers)}}]]]])
+             :handler (:audit handlers)}}]]
+
+    ["/operation"
+     {:swagger {:tags ["operations"]}}
+
+     ["/:id"
+      {:get {:summary "Retrieve async operation result"
+             :description "Retrieves the result of an asynchronous operation by operation ID"
+             :parameters {:path [:map [:id :string]]}
+             :responses {200 {:body api/operation-result-response-spec
+                              :description "Operation result retrieved successfully"}
+                         400 {:body api/error-response-spec
+                              :description "Invalid operation ID"}
+                         500 {:body api/error-response-spec
+                              :description "Internal server error"}}
+             :handler (:operation-result handlers)}}]]]])
 
 (defn create-router
   "Creates a Reitit router with the given handlers."

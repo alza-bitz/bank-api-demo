@@ -50,9 +50,25 @@
           :credit 100}]
         (throw (ex-info "Account not found" {:error :account-not-found :account-number account-number}))))))
 
+(def mock-async-service
+  "Mock async service for testing handlers."
+  (reify service/AccountService
+    (create-account [_ _name]
+      (java.util.UUID/randomUUID))  ; Return operation ID
+    (retrieve-account [_ _account-number]
+      (java.util.UUID/randomUUID))  ; Return operation ID
+    (deposit-to-account [_ _account-number _amount]
+      (java.util.UUID/randomUUID))
+    (withdraw-from-account [_ _account-number _amount]
+      (java.util.UUID/randomUUID))
+    (transfer-between-accounts [_ _sender _receiver _amount]
+      (java.util.UUID/randomUUID))
+    (retrieve-account-audit [_ _account-number]
+      (java.util.UUID/randomUUID))))
+
 (deftest create-account-handler-test
   (testing "successful account creation"
-    (let [handler (handlers/create-account-handler mock-service)
+    (let [handler (handlers/create-account-handler mock-service mock-async-service)
           request {:body-params {:name "John Doe"}}
           response (handler request)]
       (is (= 200 (:status response)))
@@ -69,7 +85,7 @@
                            (withdraw-from-account [_ _ _] nil)
                            (transfer-between-accounts [_ _ _ _] nil)
                            (retrieve-account-audit [_ _] nil))
-          handler (handlers/create-account-handler failing-service)
+          handler (handlers/create-account-handler failing-service mock-async-service)
           request {:body-params {:name "John Doe"}}
           response (handler request)]
       (is (= 500 (:status response)))
@@ -77,7 +93,7 @@
 
 (deftest view-account-handler-test
   (testing "successful account retrieval"
-    (let [handler (handlers/view-account-handler mock-service)
+    (let [handler (handlers/view-account-handler mock-service mock-async-service)
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 200 (:status response)))
@@ -86,14 +102,14 @@
       (is (= 100 (get-in response [:body :balance])))))
 
   (testing "invalid account number format"
-    (let [handler (handlers/view-account-handler mock-service)
+    (let [handler (handlers/view-account-handler mock-service mock-async-service)
           request {:path-params {:id "abc"}}
           response (handler request)]
       (is (= 400 (:status response)))
       (is (= "bad-request" (get-in response [:body :error])))))
 
   (testing "account not found"
-    (let [handler (handlers/view-account-handler mock-service)
+    (let [handler (handlers/view-account-handler mock-service mock-async-service)
           request {:path-params {:id "999"}}
           response (handler request)]
       (is (= 404 (:status response)))
@@ -108,7 +124,7 @@
                            (withdraw-from-account [_ _ _] nil)
                            (transfer-between-accounts [_ _ _ _] nil)
                            (retrieve-account-audit [_ _] nil))
-          handler (handlers/view-account-handler failing-service)
+          handler (handlers/view-account-handler failing-service mock-async-service)
           request {:path-params {:id "123"}}
           response (handler request)]
       (is (= 500 (:status response)))
@@ -210,12 +226,14 @@
 
 (deftest make-handlers-test
   (testing "make-handlers returns all expected handlers"
-    (let [handlers (handlers/make-handlers mock-service)]
+    (let [handlers (handlers/make-handlers mock-service mock-async-service)]
       (is (fn? (:create-account handlers)))
       (is (fn? (:view-account handlers)))
       (is (fn? (:deposit handlers)))
       (is (fn? (:withdraw handlers)))
-      (is (fn? (:audit handlers))))))
+      (is (fn? (:transfer handlers)))
+      (is (fn? (:audit handlers)))
+      (is (fn? (:operation-result handlers))))))
 
 (deftest audit-handler-test
   (testing "successful audit retrieval"

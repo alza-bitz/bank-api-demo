@@ -4,6 +4,11 @@
             [clojure.tools.logging :as log]
             [integrant.core :as ig]))
 
+(defn is-async-request?
+  "Checks if the request should be handled asynchronously."
+  [request]
+  (= "true" (get-in request [:query-params "async"])))
+
 (defn error-to-status-code
   "Maps error keywords to HTTP status codes."
   [error-key]
@@ -30,31 +35,45 @@
               :message default-message}})))
 
 (defn create-account-handler
-  "HTTP handler for creating bank accounts."
-  [service]
+  "HTTP handler for creating bank accounts. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [body (:body-params request)
             name (:name body)]
         (log/info "HTTP: Creating account for" name)
-        (let [account (service/create-account service name)
-              response (api/account->response account)]
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/create-account async-service name)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return account
+          (let [account (service/create-account sync-service name)
+                response (api/account->response account)]
+            {:status 200
+             :body response})))
       (catch Exception e
         (handle-exception e "HTTP: Error creating account")))))
 
 (defn view-account-handler
-  "HTTP handler for viewing bank accounts."
-  [service]
+  "HTTP handler for viewing bank accounts. Supports both sync and async modes."
+  [sync-service async-service]
   (fn [request]
     (try
       (let [account-number (-> request :path-params :id Integer/parseInt)]
         (log/info "HTTP: Viewing account" account-number)
-        (let [account (service/retrieve-account service account-number)
-              response (api/account->response account)]
-          {:status 200
-           :body response}))
+        (if (is-async-request? request)
+          ;; Async mode - return operation ID
+          (let [operation-id (service/retrieve-account async-service account-number)
+                response (api/operation-id->submit-response operation-id)]
+            {:status 202
+             :body response})
+          ;; Sync mode - return account
+          (let [account (service/retrieve-account sync-service account-number)
+                response (api/account->response account)]
+            {:status 200
+             :body response})))
       (catch NumberFormatException e
         (log/warn e "HTTP: Invalid account number format")
         {:status 400
@@ -149,15 +168,33 @@
       (catch Exception e
         (handle-exception e "HTTP: Error getting audit log")))))
 
-(defn make-handlers
-  "Creates a map of all handlers with a given service."
-  [service]
-  {:create-account (create-account-handler service)
-   :view-account (view-account-handler service)
-   :deposit (deposit-handler service)
-   :withdraw (withdraw-handler service)
-   :transfer (transfer-handler service)
-   :audit (audit-handler service)})
+(defn operation-result-handler
+  "HTTP handler for retrieving async operation results."
+  [async-service]
+  (fn [request]
+    (try
+      (let [operation-id (-> request :path-params :id)]
+        (log/info "HTTP: Getting operation result for" operation-id)
+        (let [result (service/retrieve-operation-result async-service operation-id)
+              response (api/operation-result->response operation-id result nil)]
+          {:status 200
+           :body response}))
+      (catch Exception e
+        (let [operation-id (-> request :path-params :id)
+              response (api/operation-result->response operation-id nil e)]
+          {:status 200
+           :body response})))))
 
-(defmethod ig/init-key ::handlers [_ {:keys [service]}]
-  (make-handlers service))
+(defn make-handlers
+  "Creates a map of all handlers with sync and async services."
+  [sync-service async-service]
+  {:create-account (create-account-handler sync-service async-service)
+   :view-account (view-account-handler sync-service async-service)
+   :deposit (deposit-handler sync-service)
+   :withdraw (withdraw-handler sync-service)
+   :transfer (transfer-handler sync-service)
+   :audit (audit-handler sync-service)
+   :operation-result (operation-result-handler async-service)})
+
+(defmethod ig/init-key ::handlers [_ {:keys [sync-service async-service]}]
+  (make-handlers sync-service async-service))

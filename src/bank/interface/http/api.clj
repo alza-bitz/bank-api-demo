@@ -73,6 +73,20 @@
    [:error [:string {:min 1}]]
    [:message [:string {:min 1}]]])
 
+;; Async operation response
+(def operation-submit-response-spec
+  [:map {:closed true}
+   [:operation-id [:string {:min 1}]]])
+
+;; Operation result response (wraps the actual operation result)
+(def operation-result-response-spec
+  [:map {:closed true}
+   [:operation-id [:string {:min 1}]]
+   [:status [:enum "completed" "error"]]
+   [:result {:optional true} :any] ; The actual operation result
+   [:error {:optional true} [:string {:min 1}]]
+   [:message {:optional true} [:string {:min 1}]]])
+
 ;; Conversion functions
 (defn account->response
   "Converts a saved account domain entity to HTTP response format."
@@ -88,6 +102,23 @@
            :description (:description event)}
     (:debit event) (assoc :debit (:debit event))
     (:credit event) (assoc :credit (:credit event))))
+
+(defn operation-id->submit-response
+  "Converts an operation ID to an operation submit response."
+  [operation-id]
+  {:operation-id operation-id})
+
+(defn operation-result->response
+  "Converts an operation result to an operation result response."
+  [operation-id result exception]
+  (if exception
+    {:operation-id operation-id
+     :status "error"
+     :error (name (:error (ex-data exception)))
+     :message (.getMessage exception)}
+    {:operation-id operation-id
+     :status "completed"
+     :result result}))
 
 ;; Validation functions
 (defn valid-create-account-request? [request]
@@ -122,3 +153,9 @@
 
 (defn valid-error-response? [response]
   (m/validate error-response-spec response))
+
+(defn valid-operation-submit-response? [response]
+  (m/validate operation-submit-response-spec response))
+
+(defn valid-operation-result-response? [response]
+  (m/validate operation-result-response-spec response))

@@ -86,12 +86,12 @@
   (retrieve-account-audit [_ account-number]
     (do-retrieve-account-audit repository account-number)))
 
-;; Integrant methods
-(defmethod ig/init-key ::service [_ {:keys [repository]}]
+;; Integrant methods for sync service
+(defmethod ig/init-key ::sync-service [_ {:keys [repository]}]
   (->SyncAccountService repository))
 
-(defmethod ig/halt-key! ::service [_ _]
-  ;; No cleanup needed for service
+(defmethod ig/halt-key! ::sync-service [_ _]
+  ;; No cleanup needed for sync service
   nil)
 
 (defprotocol AsyncOperationProducer
@@ -152,7 +152,7 @@
   AsyncOperationProducer
 
   (submit-operation [_ operation-fn]
-    (let [operation-id (random-uuid)
+    (let [operation-id (str (random-uuid))
           result-channel (chan 1)
           operation (->Operation operation-id operation-fn result-channel)
           current-state @state]
@@ -196,9 +196,9 @@
                                              :result-channels {}}))))
 
 ;; Integrant methods for async service
-(defmethod ig/init-key ::async-service [_ {:keys [repository pool-size]
-                                           :or {pool-size 10}}]
-  (consumer-pool-async-account-service repository pool-size))
+(defmethod ig/init-key ::async-service [_ {:keys [repository consumer-pool-size]
+                                           :or {consumer-pool-size 10}}]
+  (consumer-pool-async-account-service repository consumer-pool-size))
 
 (defmethod ig/halt-key! ::async-service [_ async-service]
   (stop async-service))

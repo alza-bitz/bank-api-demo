@@ -1,4 +1,4 @@
-(ns bank.interface.http.handler-integration-test
+(ns bank.interface.http.sync-handler-integration-test
   (:require
    [bank.application.service :as service]
    [bank.interface.http.handlers :as handlers]
@@ -10,7 +10,7 @@
 
 (def ^:dynamic *datasource* nil)
 
-(def ^:dynamic *service* nil)
+(def ^:dynamic *sync-service* nil)
 
 (def ^:dynamic *handler* nil)
 
@@ -34,11 +34,11 @@
                         tc/start!)
           datasource (->datasource container)
           repository (repo/logging-jdbc-account-repository datasource)
-          service (service/->SyncAccountService repository)
-          handler (routes/create-handler (handlers/make-handlers service))]
+          sync-service (service/->SyncAccountService repository)
+          handler (routes/create-handler (handlers/make-handlers sync-service nil))]
       (try
         (binding [*datasource* datasource
-                  *service* service
+                  *sync-service* sync-service
                   *handler* handler]
           (f))
         (finally
@@ -69,7 +69,7 @@
 (deftest view-account-integration-test
   (testing "end-to-end account viewing"
     (let [;; First create an account
-          created-account (service/create-account *service* "Jane Smith")
+          created-account (service/create-account *sync-service* "Jane Smith")
           account-number (:account-number created-account)
 
           ;; Then view it via HTTP
@@ -86,7 +86,7 @@
 (deftest deposit-integration-test
   (testing "end-to-end deposit"
     (let [;; First create an account
-          created-account (service/create-account *service* "Bob Wilson")
+          created-account (service/create-account *sync-service* "Bob Wilson")
           account-number (:account-number created-account)
 
           ;; Then deposit money via HTTP
@@ -115,7 +115,7 @@
 (deftest invalid-deposit-integration-test
   (testing "400 error for invalid deposit amount"
     (let [;; First create an account
-          created-account (service/create-account *service* "Test User")
+          created-account (service/create-account *sync-service* "Test User")
           account-number (:account-number created-account)
 
           ;; Try to deposit invalid amount
@@ -137,9 +137,9 @@
 (deftest withdraw-integration-test
   (testing "end-to-end withdraw with sufficient funds"
     (let [;; First create an account and deposit money
-          created-account (service/create-account *service* "Alice Brown")
+          created-account (service/create-account *sync-service* "Alice Brown")
           account-number (:account-number created-account)
-          _ (service/deposit-to-account *service* account-number 500)
+          _ (service/deposit-to-account *sync-service* account-number 500)
 
           ;; Then withdraw money via HTTP
           request {:request-method :post
@@ -157,9 +157,9 @@
 (deftest withdraw-insufficient-funds-integration-test
   (testing "422 error for insufficient funds"
     (let [;; First create an account with small deposit
-          created-account (service/create-account *service* "Poor User")
+          created-account (service/create-account *sync-service* "Poor User")
           account-number (:account-number created-account)
-          _ (service/deposit-to-account *service* account-number 50)
+          _ (service/deposit-to-account *sync-service* account-number 50)
 
           ;; Try to withdraw more than available
           request {:request-method :post
@@ -187,7 +187,7 @@
 (deftest invalid-withdraw-integration-test
   (testing "400 error for invalid withdraw amount"
     (let [;; First create an account
-          created-account (service/create-account *service* "Test User")
+          created-account (service/create-account *sync-service* "Test User")
           account-number (:account-number created-account)
 
           ;; Try to withdraw invalid amount
@@ -209,11 +209,11 @@
 (deftest audit-log-integration-test
   (testing "end-to-end audit log with multiple transactions"
     (let [;; Create account and perform transactions
-          created-account (service/create-account *service* "Audit User")
+          created-account (service/create-account *sync-service* "Audit User")
           account-number (:account-number created-account)
-          _ (service/deposit-to-account *service* account-number 1000)
-          _ (service/withdraw-from-account *service* account-number 200)
-          _ (service/deposit-to-account *service* account-number 300)
+          _ (service/deposit-to-account *sync-service* account-number 1000)
+          _ (service/withdraw-from-account *sync-service* account-number 200)
+          _ (service/deposit-to-account *sync-service* account-number 300)
 
           ;; Retrieve audit log via HTTP
           request {:request-method :get
@@ -248,7 +248,7 @@
 (deftest audit-log-empty-integration-test
   (testing "empty audit log for account with no transactions"
     (let [;; Create account with no transactions
-          created-account (service/create-account *service* "No Transactions User")
+          created-account (service/create-account *sync-service* "No Transactions User")
           account-number (:account-number created-account)
 
           ;; Retrieve audit log via HTTP
@@ -274,13 +274,13 @@
 (deftest transfer-money-integration-test
   (testing "successful transfer between accounts"
     (let [;; Create sender and receiver accounts
-          sender-account (service/create-account *service* "Sender")
-          receiver-account (service/create-account *service* "Receiver")
+          sender-account (service/create-account *sync-service* "Sender")
+          receiver-account (service/create-account *sync-service* "Receiver")
           sender-number (:account-number sender-account)
           receiver-number (:account-number receiver-account)
 
           ;; Deposit initial amount to sender
-          _ (service/deposit-to-account *service* sender-number 100)
+          _ (service/deposit-to-account *sync-service* sender-number 100)
 
           ;; Transfer money via HTTP
           request {:request-method :post
@@ -298,18 +298,18 @@
         (is (= 70 (get body "balance"))))
 
       ;; Verify receiver account balance
-      (let [receiver-account (service/retrieve-account *service* receiver-number)]
+      (let [receiver-account (service/retrieve-account *sync-service* receiver-number)]
         (is (= 30 (:balance receiver-account))))))
 
   (testing "transfer with insufficient funds returns 422"
     (let [;; Create sender and receiver accounts
-          sender-account (service/create-account *service* "Poor Sender")
-          receiver-account (service/create-account *service* "Receiver")
+          sender-account (service/create-account *sync-service* "Poor Sender")
+          receiver-account (service/create-account *sync-service* "Receiver")
           sender-number (:account-number sender-account)
           receiver-number (:account-number receiver-account)
 
           ;; Deposit small amount to sender
-          _ (service/deposit-to-account *service* sender-number 10)
+          _ (service/deposit-to-account *sync-service* sender-number 10)
 
           ;; Try to transfer more than available
           request {:request-method :post
@@ -326,11 +326,11 @@
 
   (testing "transfer to same account returns 422"
     (let [;; Create account
-          account (service/create-account *service* "Self Transfer")
+          account (service/create-account *sync-service* "Self Transfer")
           account-number (:account-number account)
 
           ;; Deposit amount
-          _ (service/deposit-to-account *service* account-number 100)
+          _ (service/deposit-to-account *sync-service* account-number 100)
 
           ;; Try to transfer to same account
           request {:request-method :post
@@ -347,7 +347,7 @@
 
   (testing "transfer from non-existent account returns 404"
     (let [;; Create receiver account
-          receiver-account (service/create-account *service* "Receiver")
+          receiver-account (service/create-account *sync-service* "Receiver")
           receiver-number (:account-number receiver-account)
 
           ;; Try to transfer from non-existent account
@@ -365,11 +365,11 @@
 
   (testing "transfer to non-existent account returns 404"
     (let [;; Create sender account
-          sender-account (service/create-account *service* "Sender")
+          sender-account (service/create-account *sync-service* "Sender")
           sender-number (:account-number sender-account)
 
           ;; Deposit amount
-          _ (service/deposit-to-account *service* sender-number 100)
+          _ (service/deposit-to-account *sync-service* sender-number 100)
 
           ;; Try to transfer to non-existent account
           request {:request-method :post
@@ -386,7 +386,7 @@
 
   (testing "transfer with invalid request body returns 400"
     (let [;; Create account
-          sender-account (service/create-account *service* "Sender")
+          sender-account (service/create-account *sync-service* "Sender")
           sender-number (:account-number sender-account)
 
           ;; Try transfer with missing amount
@@ -405,16 +405,16 @@
 
   (testing "transfer audit log shows correct entries"
     (let [;; Create sender and receiver accounts
-          sender-account (service/create-account *service* "Audit Sender")
-          receiver-account (service/create-account *service* "Audit Receiver")
+          sender-account (service/create-account *sync-service* "Audit Sender")
+          receiver-account (service/create-account *sync-service* "Audit Receiver")
           sender-number (:account-number sender-account)
           receiver-number (:account-number receiver-account)
 
           ;; Initial deposit
-          _ (service/deposit-to-account *service* sender-number 100)
+          _ (service/deposit-to-account *sync-service* sender-number 100)
 
           ;; Transfer money
-          _ (service/transfer-between-accounts *service* sender-number receiver-number 30)
+          _ (service/transfer-between-accounts *sync-service* sender-number receiver-number 30)
 
           ;; Check sender audit log
           sender-request {:request-method :get

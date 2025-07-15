@@ -60,8 +60,11 @@
         (is (contains? @system :bank.persistence.repository/repository)
             "System should contain repository component")
         
-        (is (contains? @system :bank.application.service/service)
-            "System should contain service component")
+        (is (contains? @system :bank.application.service/sync-service)
+            "System should contain sync service component")
+        
+        (is (contains? @system :bank.application.service/async-service)
+            "System should contain async service component")
         
         (is (contains? @system :bank.interface.http.handlers/handlers)
             "System should contain handlers component")

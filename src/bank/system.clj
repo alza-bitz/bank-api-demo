@@ -12,9 +12,13 @@
    
    :bank.persistence.repository/repository {:datasource (ig/ref :db/datasource)}
    
-   :bank.application.service/service {:repository (ig/ref :bank.persistence.repository/repository)}
+   :bank.application.service/sync-service {:repository (ig/ref :bank.persistence.repository/repository)}
    
-   :bank.interface.http.handlers/handlers {:service (ig/ref :bank.application.service/service)}
+   :bank.application.service/async-service {:repository (ig/ref :bank.persistence.repository/repository)
+                                            :consumer-pool-size 10}
+   
+   :bank.interface.http.handlers/handlers {:sync-service (ig/ref :bank.application.service/sync-service)
+                                           :async-service (ig/ref :bank.application.service/async-service)}
    
    :bank.interface.http.routes/handler {:handlers (ig/ref :bank.interface.http.handlers/handlers)}
    
