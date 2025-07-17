@@ -1,6 +1,9 @@
+# Domain layer
+- Malli function specs and generative, property-based tests for all domain functions
+
 # Persistence layer
-- In the repository, use HugSQL instead of SQL strings
-- In the repository, do nil pruning in a result set builder
+- Use HugSQL instead of SQL strings
+- Do nil pruning in a result set builder
 - SQL migrations
 - Datomic repository impl
 
@@ -13,12 +16,12 @@
 
 # Interface layer
 - Can reitit be used without ring and/or jetty? What are the other options?
-- Consider a http-integration-test using a real http client 
 - Health checks
 - HATEOAS via HAL or alternatives
 
 # System layer
-- Fix Docker Compose persistent volume permissions error
+- Fix the Docker Compose persistent volume permissions error
+- A full API integration test using a http client against a running system
 
 # Missing unit tests
 - API tests for withdraw request/response, transfer request/response
@@ -37,6 +40,8 @@
 - Minimal Github Actions workflow to run all tests on push
 
 # Other
+- Docstrings for all public functions (continue what was started in the domain layer)
+- Paging for account events
 - Reducible view over account events so it can be processed with a transducer, rather than fully loading all events into memory
-- Group integration tests using clojure.test/testing
+- Re-organise integration tests using clojure.test/testing
 - Remove unnecessary comments
