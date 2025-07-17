@@ -1,5 +1,6 @@
 # Domain layer
 - Malli function specs and generative, property-based tests for all domain functions
+- Namespaced keywords
 
 # Persistence layer
 - Use HugSQL instead of SQL strings
