@@ -1,7 +1,11 @@
 (ns bank.system
-  (:require [integrant.core :as ig]
+  (:require [bank.interface.http.handlers] ; Ensure handlers namespace is loaded
+            [bank.interface.http.routes]  ; Ensure routes namespace is loaded
+            [bank.interface.http.server]  ; Ensure server namespace is loaded
+            [bank.application.service]  ; Ensure service namespace is loaded
+            [bank.persistence.repository :as repo]
             [clojure.tools.logging :as log]
-            [bank.persistence.repository :as repo])
+            [integrant.core :as ig])
   (:gen-class)
   (:import [com.zaxxer.hikari HikariDataSource HikariConfig]))
 
@@ -9,19 +13,19 @@
   "System configuration for the banking application."
 
   {:db/datasource {}
-   
+
    :bank.persistence.repository/repository {:datasource (ig/ref :db/datasource)}
-   
+
    :bank.application.service/sync-service {:repository (ig/ref :bank.persistence.repository/repository)}
-   
+
    :bank.application.service/async-service {:repository (ig/ref :bank.persistence.repository/repository)
                                             :consumer-pool-size 10}
-   
+
    :bank.interface.http.handlers/handlers {:sync-service (ig/ref :bank.application.service/sync-service)
                                            :async-service (ig/ref :bank.application.service/async-service)}
-   
+
    :bank.interface.http.routes/handler {:handlers (ig/ref :bank.interface.http.handlers/handlers)}
-   
+
    :bank.interface.http.server/server {:handler (ig/ref :bank.interface.http.routes/handler)
                                        :port 3000}})
 
