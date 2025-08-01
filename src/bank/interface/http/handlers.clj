@@ -5,9 +5,11 @@
             [integrant.core :as ig]))
 
 (defn is-async-request?
-  "Checks if the request should be handled asynchronously."
+  "Checks if the request is asking for async processing by looking for async=true query parameter."
   [request]
-  (= "true" (get-in request [:query-params "async"])))
+  (let [async-param (or (get-in request [:query-params "async"])
+                        (get-in request [:query-params :async]))]
+    (= "true" (str async-param))))
 
 (defn error-to-status-code
   "Maps error keywords to HTTP status codes."
