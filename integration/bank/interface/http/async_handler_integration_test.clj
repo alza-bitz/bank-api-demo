@@ -428,3 +428,55 @@
       
       ;; Verify no operation failed
       (is (not-any? #(= "failed" (get % "status")) results)))))
+
+(deftest operation-result-multiple-retrieval-test
+  (testing "operation result can only be retrieved once - subsequent calls return 404"
+    ;; Create account first
+    (let [created-account (service/create-account *sync-service* "Operation Result Test User")
+          account-number (:account-number created-account)
+          
+          ;; Submit async view account request
+          submit-request {:request-method :get
+                          :uri (str "/account/" account-number)
+                          :query-params {"async" "true"}}
+          submit-response (*handler* submit-request)
+          submit-body (json/read-value (:body submit-response))
+          operation-id (get submit-body "operation-id")
+          
+          ;; First retrieval - should succeed
+          first-result-request {:request-method :get
+                                :uri (str "/operation/" operation-id)}
+          first-result-response (*handler* first-result-request)
+          first-result-body (json/read-value (:body first-result-response))
+          
+          ;; Second retrieval - should fail with 404
+          second-result-request {:request-method :get
+                                 :uri (str "/operation/" operation-id)}
+          second-result-response (*handler* second-result-request)
+          second-result-body (json/read-value (:body second-result-response))
+          
+          ;; Third retrieval - should also fail with 404
+          third-result-request {:request-method :get
+                                :uri (str "/operation/" operation-id)}
+          third-result-response (*handler* third-result-request)
+          third-result-body (json/read-value (:body third-result-response))]
+      
+      ;; Verify async operation was submitted successfully
+      (is (= 202 (:status submit-response)))
+      (is (string? operation-id))
+      
+      ;; Verify first retrieval succeeds
+      (is (= 200 (:status first-result-response)))
+      (is (= "completed" (get first-result-body "status")))
+      (is (= "Operation Result Test User" (get-in first-result-body ["result" "name"])))
+      (is (= account-number (get-in first-result-body ["result" "account-number"])))
+      
+      ;; Verify second retrieval fails with 404 and operation-not-found error
+      (is (= 404 (:status second-result-response)))
+      (is (= "operation-not-found" (get second-result-body "error")))
+      (is (some? (get second-result-body "message")))
+      
+      ;; Verify third retrieval also fails with 404 and operation-not-found error
+      (is (= 404 (:status third-result-response)))
+      (is (= "operation-not-found" (get third-result-body "error")))
+      (is (some? (get third-result-body "message"))))))
