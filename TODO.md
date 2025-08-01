@@ -16,13 +16,14 @@
 - A scheduled cleanup function that closes the per-operation result channels and removes them from the state atom after a certain time period has elapsed since the message was put, e.g. 1 minute. Would require a timestamp in the per-operation result channel message?
 
 # Interface layer
+- For POST requests that create resources, 201 (Created) is more appropriate than 200
 - Can reitit be used without ring and/or jetty? What are the other options?
 - Health checks
 - HATEOAS via HAL or alternatives
 
 # System layer
 - Fix the Docker Compose persistent volume permissions error
-- A full API integration test using a http client against a running system
+- A client integration test that uses a http client against a running system
 
 # Missing unit tests
 - API tests for withdraw request/response, transfer request/response

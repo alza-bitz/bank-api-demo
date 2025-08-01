@@ -4,6 +4,7 @@
             [reitit.swagger-ui :as swagger-ui]
             [reitit.ring.middleware.muuntaja :as muuntaja]
             [reitit.ring.middleware.exception :as exception]
+            [reitit.ring.middleware.parameters :as parameters]
             [reitit.coercion.malli :as malli]
             [reitit.ring.coercion :as coercion]
             [muuntaja.core :as m]
@@ -15,6 +16,7 @@
   {:muuntaja m/instance
    :coercion malli/coercion
    :middleware [openapi/openapi-feature
+                parameters/parameters-middleware
                 muuntaja/format-negotiate-middleware
                 muuntaja/format-response-middleware
                 exception/exception-middleware

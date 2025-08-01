@@ -5,15 +5,18 @@
             [integrant.core :as ig]))
 
 (defn is-async-request?
-  "Checks if the request should be handled asynchronously."
+  "Checks if the request is asking for async processing by looking for async=true query parameter."
   [request]
-  (= "true" (get-in request [:query-params "async"])))
+  (let [async-param (or (get-in request [:query-params "async"])
+                        (get-in request [:query-params :async]))]
+    (= "true" (str async-param))))
 
 (defn error-to-status-code
   "Maps error keywords to HTTP status codes."
   [error-key]
   (case error-key
     :account-not-found 404
+    :operation-not-found 404
     :insufficient-funds 422
     :same-account-transfer 422
     :invalid-account-number 400
@@ -208,10 +211,7 @@
           {:status 200
            :body response}))
       (catch Exception e
-        (let [operation-id (-> request :path-params :id)
-              response (api/operation-result->response operation-id nil e)]
-          {:status 200
-           :body response})))))
+        (handle-exception e "HTTP: Error retrieving operation result")))))
 
 (defn make-handlers
   "Creates a map of all handlers with sync and async services."

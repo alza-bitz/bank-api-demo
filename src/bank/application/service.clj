@@ -171,7 +171,9 @@
               ;; Clean up the result channel registry
               (swap! state update :result-channels dissoc operation-id)
               (close! result-channel)
-              (throw (ex-info "Operation timeout" {:operation-id operation-id})))
+              (throw (ex-info "Operation timeout" {:error :operation-timeout
+                                                   :message "Operation timeout"
+                                                   :operation-id operation-id})))
 
             :else
             (do
@@ -182,7 +184,9 @@
               (if (:exception result)
                 (throw (:exception result))
                 (:result result)))))
-        (throw (ex-info "Operation not found" {:operation-id operation-id}))))))
+        (throw (ex-info "Operation not found" {:error :operation-not-found
+                                               :message "Operation not found"
+                                               :operation-id operation-id}))))))
 
 (defn consumer-pool-async-account-service
   "Factory function to create AsyncAccountService with internal state management."
