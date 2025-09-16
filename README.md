@@ -1,8 +1,12 @@
-# Banking API
+# Banking API Demo
 
-A feature-complete Clojure-based HTTP API for managing banking accounts with Domain-Driven Design (DDD) architecture and asynchronous processing capabilities.
+## Summary
+
+A feature-complete Clojure-based HTTP API for managing bank accounts. The solution addresses the requirements outlined in the [problem statement](.github/instructions/problem_statement_and_requirements.instructions.md) and follows the architecture described in the [solution design](.github/instructions/solution_design.instructions.md) with Domain-Driven Design (DDD) architecture and asynchronous processing capabilities.
 
 ## Features
+
+All currently implemented features are summarised here. The [problem statement and requirements instructions](.github/instructions/problem_statement_and_requirements.instructions.md) give more details for each feature.
 
 - ✅ Create bank accounts with unique account numbers
 - ✅ View account details
@@ -15,40 +19,21 @@ A feature-complete Clojure-based HTTP API for managing banking accounts with Dom
 - ✅ OpenAPI 3.x documentation
 - ✅ Comprehensive error handling
 
-## Architecture
-
-The application follows DDD layered architecture with both synchronous and asynchronous processing:
-
-- **Domain Layer**: Core business logic, entities, and domain events
-- **Persistence Layer**: Database operations using PostgreSQL with HikariCP connection pooling
-- **Application Layer**: Use cases, business workflows, and async operation handling
-- **Interface Layer**: HTTP API with JSON REST endpoints supporting both sync and async modes
-- **System Layer**: Application lifecycle, dependency management, and Integrant configuration
-
-## Technology Stack
-
-- **Language**: Clojure 1.12
-- **HTTP Server**: Jetty with Reitit routing
-- **Database**: PostgreSQL with next.jdbc and HikariCP
-- **JSON Processing**: Jsonista and Muuntaja
-- **Validation**: Malli for schema validation
-- **Async Processing**: core.async for concurrent operations
-- **Dependency Injection**: Integrant for system lifecycle
-- **Testing**: clojure.test with testcontainers for integration tests
-- **Logging**: tools.logging with log4j2
-
 ## Prerequisites
 
 - Java 11 or higher
 - Clojure CLI
 - Docker and Docker Compose (for PostgreSQL)
+- Curl and JQ command-line tools (to follow the usage examples)
 
-## Quick Start
+Alternatively, use an editor or environment that supports [dev containers](https://containers.dev). The supplied [devcontainer.json](.devcontainer/devcontainer.json) will install all the above prerequisites.
+
+## Usage
 
 ### 1. Start PostgreSQL
 
 ```bash
-docker-compose up -d postgres
+$ docker-compose up -d postgres
 ```
 
 This will start a PostgreSQL container. The database schema will be automatically created when the application starts.
@@ -56,7 +41,7 @@ This will start a PostgreSQL container. The database schema will be automaticall
 ### 2. Run the Application
 
 ```bash
-clojure -M:run
+$ clojure -M:run
 ```
 
 The application will start on `http://localhost:3000`
@@ -67,40 +52,44 @@ The application will start on `http://localhost:3000`
 
 Create an account:
 ```bash
-curl -X POST http://localhost:3000/account \
-  -H "Content-Type: application/json" \
-  -d '{"name": "John Doe"}'
+$ curl -X POST http://localhost:3000/account \
+    -H "Content-Type: application/json" \
+    -d '{"name": "John Doe"}' |
+  jq
 ```
 
 View an account:
 ```bash
-curl http://localhost:3000/account/1
+$ curl http://localhost:3000/account/1 | jq
 ```
 
 Deposit money:
 ```bash
-curl -X POST http://localhost:3000/account/1/deposit \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 100}'
+$ curl -X POST http://localhost:3000/account/1/deposit \
+    -H "Content-Type: application/json" \
+    -d '{"amount": 100}' |
+  jq
 ```
 
 Withdraw money:
 ```bash
-curl -X POST http://localhost:3000/account/1/withdraw \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 50}'
+$ curl -X POST http://localhost:3000/account/1/withdraw \
+    -H "Content-Type: application/json" \
+    -d '{"amount": 50}' |
+  jq
 ```
 
 Transfer money:
 ```bash
-curl -X POST http://localhost:3000/account/1/send \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 25, "account-number": 2}'
+$ curl -X POST http://localhost:3000/account/1/send \
+    -H "Content-Type: application/json" \
+    -d '{"amount": 25, "account-number": 2}' |
+  jq
 ```
 
 Get account audit log:
 ```bash
-curl http://localhost:3000/account/1/audit
+$ curl http://localhost:3000/account/1/audit | jq
 ```
 
 #### Asynchronous API
@@ -109,15 +98,36 @@ For asynchronous processing, add `?async=true` to any endpoint:
 
 ```bash
 # Submit async operation
-curl -X POST "http://localhost:3000/account?async=true" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Jane Doe"}'
+$ curl -X POST "http://localhost:3000/account?async=true" \
+    -H "Content-Type: application/json" \
+    -d '{"name": "Jane Doe"}' |
+  jq
 # Returns: {"operation-id": "uuid", "status": "submitted"}
 
 # Check operation result
-curl http://localhost:3000/operation/{operation-id}
+$ curl http://localhost:3000/operation/{operation-id} | jq
 # Returns: {"status": "completed", "result": {...}}
 ```
+
+## API Documentation
+
+The API documentation is available at `http://localhost:3000/swagger` when the application is running.
+
+## API Endpoints
+
+### Synchronous Operations
+- `POST /account` - Create account
+- `GET /account/{id}` - View account
+- `POST /account/{id}/deposit` - Deposit money
+- `POST /account/{id}/withdraw` - Withdraw money
+- `POST /account/{id}/send` - Transfer money
+- `GET /account/{id}/audit` - Get audit log
+
+### Asynchronous Operations
+Add `?async=true` to any of the above endpoints to use async mode.
+
+### Operation Results
+- `GET /operation/{id}` - Get async operation result
 
 ## Configuration
 
@@ -134,36 +144,27 @@ The application can be configured using environment variables:
 
 ## Development
 
-### Implementation
+### Approach
 
-This project was implemented iteratively by feature slice and DDD layer. The implementation was guided by comprehensive instruction files located in `.github/instructions/`:
-
-- **[approach.instructions.md](.github/instructions/approach.instructions.md)**: Development approach using feature slices and DDD layers
-- **[problem_statement_and_requirements.instructions.md](.github/instructions/problem_statement_and_requirements.instructions.md)**: The original specification copied from [bank.md](https://gitlab.com/greenhousecode/lemonpi/hiring/-/blob/master/assignments/bank.md)
-- **[solution_design.instructions.md](.github/instructions/solution_design.instructions.md)**: Architecture design with synchronous and asynchronous implementations
-- **[solution_design_postgres.instructions.md](.github/instructions/solution_design_postgres.instructions.md)**: PostgreSQL persistence layer specifications
-- **[tests.instructions.md](.github/instructions/tests.instructions.md)**: Testing strategy and patterns
-- **[repl_and_deps.instructions.md](.github/instructions/repl_and_deps.instructions.md)**: REPL development workflow
-
-These instructions provide detailed guidance for extending the system, implementing new features, and maintaining code quality standards.
+The [development approach instructions](.github/instructions/development_approach.instructions.md) provide details on the development approach and methodology used.
 
 ### Running Tests
 
 Unit tests:
 ```bash
-clojure -M:test
+$ clojure -M:test
 ```
 
 Integration tests:
 ```bash
-clojure -M:integration
+$ clojure -M:integration
 ```
 
 ### REPL Development
 
 Start a REPL with development dependencies:
 ```bash
-clojure -M:dev
+$ clj -M:dev
 ```
 
 In the REPL:
@@ -175,34 +176,7 @@ In the REPL:
 (system/stop-system!)
 ```
 
-### API Documentation
-
-The API documentation is available at `http://localhost:3000/swagger` when the application is running.
-
-### API Endpoints
-
-#### Synchronous Operations
-- `POST /account` - Create account
-- `GET /account/{id}` - View account
-- `POST /account/{id}/deposit` - Deposit money
-- `POST /account/{id}/withdraw` - Withdraw money
-- `POST /account/{id}/send` - Transfer money
-- `GET /account/{id}/audit` - Get audit log
-
-#### Asynchronous Operations
-Add `?async=true` to any of the above endpoints to use async mode.
-
-#### Operation Results
-- `GET /operation/{id}` - Get async operation result
-
-### Performance Features
-
-- **Concurrent Processing**: Handles up to 1000 concurrent requests
-- **Connection Pooling**: HikariCP for efficient database connections
-- **Async Processing**: Non-blocking operation handling with configurable consumer pools
-- **Database Transactions**: ACID compliance for all banking operations
-
-## Production Deployment
+## Deployment
 
 ### Build Uberjar
 
@@ -216,28 +190,18 @@ clojure -T:uberjar
 java -jar target/bank-api.jar
 ```
 
-## Database Schema
+## Technical Architecture
 
-The application uses two main tables:
+For detailed technical information about the tech stack and architectural decisions, see the separate [Technical Architecture](docs/technical-architecture.md) documentation.
 
-- `account`: Stores account information (account_number, name, balance)
-- `account_event`: Stores account transaction events for audit trail (sequence, event_id, account_number, debit, credit, description)
+## Acknowledgements
 
-## Testing
-
-The application includes comprehensive test coverage:
-
-- **Unit Tests**: Domain logic, application services, HTTP handlers, repository operations
-- **Integration Tests**: End-to-end testing with PostgreSQL testcontainers
-- **Concurrent Tests**: Validates 1000+ concurrent request processing
-- **Async Tests**: Validates asynchronous operation lifecycle
-
-### Test Coverage
-- Domain layer: Account creation, validation, business rules
-- Application layer: Sync and async service operations
-- Interface layer: HTTP handlers, routing, error handling
-- Persistence layer: Database operations, transaction handling
+This project was developed as a take-home assessment for a Clojure Engineer position, implementing the requirements specified in the [problem statement](.github/instructions/problem_statement_and_requirements.instructions.md).
 
 ## License
 
-Copyright © 2025
+Copyright © 2025 Alex Coyle
+
+Distributed under the [Eclipse Public License](LICENSE) either version 1.0 or (at your option) any later version.
+
+The problem statement and requirements are copyright © 2025 [WPP Media](https://wppmedia.com).
