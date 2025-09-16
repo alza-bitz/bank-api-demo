@@ -2,14 +2,7 @@
 applyTo: '**'
 ---
 
-The solution design is loosely based on the DDD layered approach. The meaning of "loosely" will be explained in the following sections.
-
-# All layers
-- Don't create any namespaces with the same name.
-- Don't create any code that leaves unused vars.
-- Don't create any code with redundant let expressions.
-- Use Integrant for dependency injection and system lifecycle management.
-- Use log4j2 for the logging implementation, and org.clojure/tools.logging for the logging api.
+The solution design is loosely based on the Domain-Driven Design (DDD) layered approach. The meaning of "loosely" will be explained in the following sections.
 
 # Domain layer
 - There is only one aggregate in the domain: the account, which is also the aggregate root.
@@ -82,3 +75,10 @@ The solution design is loosely based on the DDD layered approach. The meaning of
 - The configured system should use the JdbcAccountRepository with a Hikari connection pool. The pool should be closed when the system is stopped.
 - 
 - Integration tests should assert the system can be started without errors, and a started system can be stopped without errors.
+
+# All layers
+- Don't create any namespaces with the same name.
+- Don't create any code that leaves unused vars.
+- Don't create any code with redundant let expressions.
+- Use Integrant for dependency injection and system lifecycle management.
+- Use log4j2 for the logging implementation, and org.clojure/tools.logging for the logging api.

@@ -2,7 +2,7 @@
 
 ## Summary
 
-A feature-complete Clojure-based HTTP API for managing bank accounts. The solution addresses the requirements outlined in the [problem statement](.github/instructions/problem_statement_and_requirements.instructions.md) and follows the architecture described in the [solution design](.github/instructions/solution_design.instructions.md) with Domain-Driven Design (DDD) architecture and asynchronous processing capabilities.
+A feature-complete Clojure-based HTTP API for managing bank accounts. The solution addresses the requirements outlined in the [problem statement](.github/instructions/problem_statement_and_requirements.instructions.md) and follows the architecture described in the [solution design](.github/instructions/solution_design.instructions.md).
 
 ## Features
 
