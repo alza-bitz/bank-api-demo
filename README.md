@@ -176,20 +176,6 @@ In the REPL:
 (system/stop-system!)
 ```
 
-## Deployment
-
-### Build Uberjar
-
-```bash
-clojure -T:uberjar
-```
-
-### Run Uberjar
-
-```bash
-java -jar target/bank-api.jar
-```
-
 ## Technical Architecture
 
 For detailed technical information about the tech stack and architectural decisions, see the separate [Technical Architecture](docs/technical-architecture.md) documentation.
